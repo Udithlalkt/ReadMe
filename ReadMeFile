@@ -1,0 +1,124 @@
+// File: pom.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.3.4</version>
+        <relativePath/>
+    </parent>
+    <groupId>com.example</groupId>
+    <artifactId>ibm-mq-listener</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>ibm-mq-listener</name>
+    <description>IBM MQ Listener with Spring Boot</description>
+    
+    <properties>
+        <java.version>17</java.version>
+    </properties>
+    
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.ibm.mq</groupId>
+            <artifactId>mq-jms-spring-boot-starter</artifactId>
+            <version>3.3.4</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+
+// File: src/main/java/com/example/ibmmqlistener/IbmMqListenerApplication.java
+package com.example.ibmmqlistener;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class IbmMqListenerApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(IbmMqListenerApplication.class, args);
+    }
+}
+
+// File: src/main/java/com/example/ibmmqlistener/config/MQConfig.java
+package com.example.ibmmqlistener.config;
+
+import com.ibm.mq.spring.boot.MQConfigurationProperties;
+import com.ibm.mq.spring.boot.MQConnectionFactoryFactory;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.jms.config.DefaultJmsListenerContainerFactory;
+import org.springframework.jms.config.JmsListenerContainerFactory;
+
+import javax.jms.ConnectionFactory;
+
+@Configuration
+public class MQConfig {
+
+    @Bean
+    public JmsListenerContainerFactory<?> myFactory(MQConnectionFactoryFactory mqConnectionFactoryFactory,
+                                                    MQConfigurationProperties properties) throws Exception {
+        DefaultJmsListenerContainerFactory factory = new DefaultJmsListenerContainerFactory();
+        ConnectionFactory connectionFactory = mqConnectionFactoryFactory.createConnectionFactory(properties);
+        factory.setConnectionFactory(connectionFactory);
+        factory.setPubSubDomain(false);  // Set to true for pub/sub
+        return factory;
+    }
+}
+
+// File: src/main/java/com/example/ibmmqlistener/listener/MQListener.java
+package com.example.ibmmqlistener.listener;
+
+import com.ibm.mq.spring.boot.MQConfigurationProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jms.annotation.JmsListener;
+import org.springframework.stereotype.Component;
+
+import javax.jms.JMSException;
+import javax.jms.Message;
+import javax.jms.TextMessage;
+
+@Component
+public class MQListener {
+
+    private static final Logger logger = LoggerFactory.getLogger(MQListener.class);
+
+    @Autowired
+    private MQConfigurationProperties properties;
+
+    @JmsListener(destination = "${ibm.mq.queue}", containerFactory = "myFactory")
+    public void receiveMessage(Message message) throws JMSException {
+        if (message instanceof TextMessage) {
+            String text = ((TextMessage) message).getText();
+            logger.info("Received message from queue {}: {}", properties.getQueue(), text);
+        } else {
+            logger.warn("Received message of unexpected type: {}", message.getClass().getName());
+        }
+    }
+}
+
+// File: src/main/resources/application.properties
+ibm.mq.queueManager=YOUR_QUEUE_MANAGER
+ibm.mq.channel=YOUR_CHANNEL
+ibm.mq.connName=YOUR_CONNECTION_NAME(1414)
+ibm.mq.user=YOUR_USERNAME
+ibm.mq.password=YOUR_PASSWORD
+ibm.mq.queue=YOUR_QUEUE_NAME
