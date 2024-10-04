@@ -1,156 +1,174 @@
-// File: pom.xml
-<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
-    <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.3.4</version>
-        <relativePath/>
-    </parent>
-    <groupId>com.example</groupId>
-    <artifactId>ibm-mq-listener</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
-    <name>ibm-mq-listener</name>
-    <description>IBM MQ Listener with Spring Boot</description>
-    
-    <properties>
-        <java.version>17</java.version>
-    </properties>
-    
-    <dependencies>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.ibm.mq</groupId>
-            <artifactId>mq-jms-spring-boot-starter</artifactId>
-            <version>3.3.4</version>
-        </dependency>
-    </dependencies>
-
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-            </plugin>
-        </plugins>
-    </build>
-</project>
-
-// File: src/main/java/com/example/ibmmqlistener/IbmMqListenerApplication.java
-package com.example.ibmmqlistener;
+package com.example.mq.listener;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
+import org.springframework.jms.annotation.EnableJms;
+import org.springframework.jms.core.JmsTemplate;
+import jakarta.jms.ConnectionFactory;
 
 @SpringBootApplication
-public class IbmMqListenerApplication {
+@EnableJms
+public class MqListenerApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(IbmMqListenerApplication.class, args);
+        SpringApplication.run(MqListenerApplication.class, args);
+    }
+
+    @Bean
+    public JmsTemplate jmsTemplate(ConnectionFactory connectionFactory) {
+        return new JmsTemplate(connectionFactory);
     }
 }
 
-// File: src/main/java/com/example/ibmmqlistener/config/MQConfig.java
-package com.example.ibmmqlistener.config;
+
+
+
+package com.example.mq.listener;
 
 import com.ibm.mq.jms.MQConnectionFactory;
 import com.ibm.msg.client.wmq.WMQConstants;
-import org.springframework.beans.factory.annotation.Value;
+import jakarta.jms.ConnectionFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.jms.config.DefaultJmsListenerContainerFactory;
-import org.springframework.jms.connection.CachingConnectionFactory;
-
-import javax.jms.JMSException;
+import org.springframework.jms.connection.UserCredentialsConnectionFactoryAdapter;
 
 @Configuration
-public class MQConfig {
+public class MqConfig {
 
-    @Value("${ibm.mq.queueManager}")
-    private String queueManager;
-
-    @Value("${ibm.mq.channel}")
-    private String channel;
-
-    @Value("${ibm.mq.connName}")
-    private String connName;
-
-    @Value("${ibm.mq.user}")
-    private String user;
-
-    @Value("${ibm.mq.password}")
-    private String password;
+    @Autowired
+    private MqProperties mqProperties;
 
     @Bean
-    public MQConnectionFactory mqConnectionFactory() throws JMSException {
-        MQConnectionFactory factory = new MQConnectionFactory();
-        factory.setHostName(connName.split("\\(")[0]);
-        factory.setPort(Integer.parseInt(connName.split("\\(")[1].replace(")", "")));
-        factory.setQueueManager(queueManager);
-        factory.setChannel(channel);
-        factory.setTransportType(WMQConstants.WMQ_CM_CLIENT);
-        factory.setStringProperty(WMQConstants.USER_AUTHENTICATION_MQCSP, "true");
-        factory.setStringProperty(WMQConstants.USERID, user);
-        factory.setStringProperty(WMQConstants.PASSWORD, password);
-        return factory;
-    }
+    public ConnectionFactory mqConnectionFactory() throws Exception {
+        MQConnectionFactory mqConnectionFactory = new MQConnectionFactory();
+        mqConnectionFactory.setHostName(mqProperties.getConnName().split("\\(")[0]);
+        mqConnectionFactory.setPort(Integer.parseInt(mqProperties.getConnName().replaceAll("\\D+", "")));
+        mqConnectionFactory.setQueueManager(mqProperties.getQueueManager());
+        mqConnectionFactory.setChannel(mqProperties.getChannel());
+        mqConnectionFactory.setTransportType(WMQConstants.WMQ_CM_CLIENT);
 
-    @Bean
-    public CachingConnectionFactory cachingConnectionFactory(MQConnectionFactory mqConnectionFactory) {
-        return new CachingConnectionFactory(mqConnectionFactory);
-    }
-
-    @Bean
-    public DefaultJmsListenerContainerFactory jmsListenerContainerFactory(CachingConnectionFactory cachingConnectionFactory) {
-        DefaultJmsListenerContainerFactory factory = new DefaultJmsListenerContainerFactory();
-        factory.setConnectionFactory(cachingConnectionFactory);
-        factory.setPubSubDomain(false);
-        return factory;
+        UserCredentialsConnectionFactoryAdapter adapter = new UserCredentialsConnectionFactoryAdapter();
+        adapter.setTargetConnectionFactory(mqConnectionFactory);
+        adapter.setUsername(mqProperties.getUser());
+        adapter.setPassword(mqProperties.getPassword());
+        return adapter;
     }
 }
 
-// File: src/main/java/com/example/ibmmqlistener/listener/MQListener.java
-package com.example.ibmmqlistener.listener;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jms.annotation.JmsListener;
+
+
+
+
+package com.example.mq.listener;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
-import javax.jms.JMSException;
-import javax.jms.Message;
-import javax.jms.TextMessage;
-
 @Component
-public class MQListener {
+@ConfigurationProperties(prefix = "ibm.mq")
+public class MqProperties {
 
-    private static final Logger logger = LoggerFactory.getLogger(MQListener.class);
+    private String queueManager = "QM1";
+    private String channel = "DEV.APP.SVRCONN";
+    private String connName = "localhost(1414)";
+    private String user = "admin";
+    private String password = "passw0rd";
+    private String queue = "DEV.QUEUE.1";
 
-    @Value("${ibm.mq.queue}")
-    private String queueName;
+    // Getters and setters
+    public String getQueueManager() {
+        return queueManager;
+    }
 
-    @JmsListener(destination = "${ibm.mq.queue}", containerFactory = "jmsListenerContainerFactory")
-    public void receiveMessage(Message message) throws JMSException {
-        if (message instanceof TextMessage) {
-            String text = ((TextMessage) message).getText();
-            logger.info("Received message from queue {}: {}", queueName, text);
-        } else {
-            logger.warn("Received message of unexpected type: {}", message.getClass().getName());
+    public void setQueueManager(String queueManager) {
+        this.queueManager = queueManager;
+    }
+
+    public String getChannel() {
+        return channel;
+    }
+
+    public void setChannel(String channel) {
+        this.channel = channel;
+    }
+
+    public String getConnName() {
+        return connName;
+    }
+
+    public void setConnName(String connName) {
+        this.connName = connName;
+    }
+
+    public String getUser() {
+        return user;
+    }
+
+    public void setUser(String user) {
+        this.user = user;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public String getQueue() {
+        return queue;
+    }
+
+    public void setQueue(String queue) {
+        this.queue = queue;
+    }
+}
+
+
+
+
+package com.example.mq.listener;
+
+import jakarta.jms.Message;
+import jakarta.jms.TextMessage;
+import org.springframework.jms.annotation.JmsListener;
+import org.springframework.stereotype.Service;
+
+@Service
+public class MqListenerService {
+
+    @JmsListener(destination = "${ibm.mq.queue}")
+    public void receiveMessage(Message message) {
+        try {
+            if (message instanceof TextMessage) {
+                String text = ((TextMessage) message).getText();
+                System.out.println("Received message: " + text);
+
+                // Simulate processing the message
+                System.out.println("Acknowledgement sent for message: " + text);
+            } else {
+                System.out.println("Received non-text message");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }
 
-// File: src/main/resources/application.properties
-ibm.mq.queueManager=YOUR_QUEUE_MANAGER
-ibm.mq.channel=YOUR_CHANNEL
-ibm.mq.connName=YOUR_CONNECTION_NAME(1414)
-ibm.mq.user=YOUR_USERNAME
-ibm.mq.password=YOUR_PASSWORD
-ibm.mq.queue=YOUR_QUEUE_NAME
+
+
+
+
+
+
+# IBM MQ Configuration
+ibm.mq.queue-manager=QM1
+ibm.mq.channel=DEV.APP.SVRCONN
+ibm.mq.conn-name=localhost(1414)
+ibm.mq.user=admin
+ibm.mq.password=passw0rd
+ibm.mq.queue=DEV.QUEUE.1
