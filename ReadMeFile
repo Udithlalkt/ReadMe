@@ -59,25 +59,58 @@ public class IbmMqListenerApplication {
 // File: src/main/java/com/example/ibmmqlistener/config/MQConfig.java
 package com.example.ibmmqlistener.config;
 
-import com.ibm.mq.spring.boot.MQConfigurationProperties;
-import com.ibm.mq.spring.boot.MQConnectionFactoryFactory;
+import com.ibm.mq.jms.MQConnectionFactory;
+import com.ibm.msg.client.wmq.WMQConstants;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jms.config.DefaultJmsListenerContainerFactory;
-import org.springframework.jms.config.JmsListenerContainerFactory;
+import org.springframework.jms.connection.CachingConnectionFactory;
 
-import javax.jms.ConnectionFactory;
+import javax.jms.JMSException;
 
 @Configuration
 public class MQConfig {
 
+    @Value("${ibm.mq.queueManager}")
+    private String queueManager;
+
+    @Value("${ibm.mq.channel}")
+    private String channel;
+
+    @Value("${ibm.mq.connName}")
+    private String connName;
+
+    @Value("${ibm.mq.user}")
+    private String user;
+
+    @Value("${ibm.mq.password}")
+    private String password;
+
     @Bean
-    public JmsListenerContainerFactory<?> myFactory(MQConnectionFactoryFactory mqConnectionFactoryFactory,
-                                                    MQConfigurationProperties properties) throws Exception {
+    public MQConnectionFactory mqConnectionFactory() throws JMSException {
+        MQConnectionFactory factory = new MQConnectionFactory();
+        factory.setHostName(connName.split("\\(")[0]);
+        factory.setPort(Integer.parseInt(connName.split("\\(")[1].replace(")", "")));
+        factory.setQueueManager(queueManager);
+        factory.setChannel(channel);
+        factory.setTransportType(WMQConstants.WMQ_CM_CLIENT);
+        factory.setStringProperty(WMQConstants.USER_AUTHENTICATION_MQCSP, "true");
+        factory.setStringProperty(WMQConstants.USERID, user);
+        factory.setStringProperty(WMQConstants.PASSWORD, password);
+        return factory;
+    }
+
+    @Bean
+    public CachingConnectionFactory cachingConnectionFactory(MQConnectionFactory mqConnectionFactory) {
+        return new CachingConnectionFactory(mqConnectionFactory);
+    }
+
+    @Bean
+    public DefaultJmsListenerContainerFactory jmsListenerContainerFactory(CachingConnectionFactory cachingConnectionFactory) {
         DefaultJmsListenerContainerFactory factory = new DefaultJmsListenerContainerFactory();
-        ConnectionFactory connectionFactory = mqConnectionFactoryFactory.createConnectionFactory(properties);
-        factory.setConnectionFactory(connectionFactory);
-        factory.setPubSubDomain(false);  // Set to true for pub/sub
+        factory.setConnectionFactory(cachingConnectionFactory);
+        factory.setPubSubDomain(false);
         return factory;
     }
 }
@@ -85,10 +118,9 @@ public class MQConfig {
 // File: src/main/java/com/example/ibmmqlistener/listener/MQListener.java
 package com.example.ibmmqlistener.listener;
 
-import com.ibm.mq.spring.boot.MQConfigurationProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jms.annotation.JmsListener;
 import org.springframework.stereotype.Component;
 
@@ -101,14 +133,14 @@ public class MQListener {
 
     private static final Logger logger = LoggerFactory.getLogger(MQListener.class);
 
-    @Autowired
-    private MQConfigurationProperties properties;
+    @Value("${ibm.mq.queue}")
+    private String queueName;
 
-    @JmsListener(destination = "${ibm.mq.queue}", containerFactory = "myFactory")
+    @JmsListener(destination = "${ibm.mq.queue}", containerFactory = "jmsListenerContainerFactory")
     public void receiveMessage(Message message) throws JMSException {
         if (message instanceof TextMessage) {
             String text = ((TextMessage) message).getText();
-            logger.info("Received message from queue {}: {}", properties.getQueue(), text);
+            logger.info("Received message from queue {}: {}", queueName, text);
         } else {
             logger.warn("Received message of unexpected type: {}", message.getClass().getName());
         }
