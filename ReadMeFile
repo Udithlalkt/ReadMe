@@ -1,59 +1,25 @@
-package com.example.mq.listener;
-
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.annotation.Bean;
-import org.springframework.jms.annotation.EnableJms;
-import org.springframework.jms.core.JmsTemplate;
-import jakarta.jms.ConnectionFactory;
-
-@SpringBootApplication
-@EnableJms
-public class MqListenerApplication {
-
-    public static void main(String[] args) {
-        SpringApplication.run(MqListenerApplication.class, args);
-    }
-
-    @Bean
-    public JmsTemplate jmsTemplate(ConnectionFactory connectionFactory) {
-        return new JmsTemplate(connectionFactory);
-    }
-}
-
-
-
-
-package com.example.mq.listener;
-
-import com.ibm.mq.jms.MQConnectionFactory;
-import com.ibm.msg.client.wmq.WMQConstants;
-import jakarta.jms.ConnectionFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.jms.connection.UserCredentialsConnectionFactoryAdapter;
+import org.springframework.jms.core.JmsTemplate;
+import com.ibm.mq.jms.MQConnectionFactory;
+import javax.jms.JMSException;
 
 @Configuration
-public class MqConfig {
-
-    @Autowired
-    private MqProperties mqProperties;
+public class NewMQConfig {
 
     @Bean
-    public ConnectionFactory mqConnectionFactory() throws Exception {
-        MQConnectionFactory mqConnectionFactory = new MQConnectionFactory();
-        mqConnectionFactory.setHostName(mqProperties.getConnName().split("\\(")[0]);
-        mqConnectionFactory.setPort(Integer.parseInt(mqProperties.getConnName().replaceAll("\\D+", "")));
-        mqConnectionFactory.setQueueManager(mqProperties.getQueueManager());
-        mqConnectionFactory.setChannel(mqProperties.getChannel());
-        mqConnectionFactory.setTransportType(WMQConstants.WMQ_CM_CLIENT);
+    public MQConnectionFactory newMQConnectionFactory() throws JMSException {
+        MQConnectionFactory factory = new MQConnectionFactory();
+        factory.setHostName("${newIBMMQ.host}");
+        factory.setPort(Integer.parseInt("${newIBMMQ.port}"));
+        factory.setChannel("${newIBMMQ.channel}");
+        factory.setQueueManager("${newIBMMQ.queueManager}");
+        return factory;
+    }
 
-        UserCredentialsConnectionFactoryAdapter adapter = new UserCredentialsConnectionFactoryAdapter();
-        adapter.setTargetConnectionFactory(mqConnectionFactory);
-        adapter.setUsername(mqProperties.getUser());
-        adapter.setPassword(mqProperties.getPassword());
-        return adapter;
+    @Bean
+    public JmsTemplate newJmsTemplate(MQConnectionFactory newMQConnectionFactory) {
+        return new JmsTemplate(newMQConnectionFactory);
     }
 }
 
@@ -61,114 +27,115 @@ public class MqConfig {
 
 
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jms.core.JmsTemplate;
+import org.springframework.stereotype.Service;
 
-package com.example.mq.listener;
+@Service
+public class MQPushService {
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
+    @Autowired
+    private JmsTemplate newJmsTemplate;
 
-@Component
-@ConfigurationProperties(prefix = "ibm.mq")
-public class MqProperties {
-
-    private String queueManager = "QM1";
-    private String channel = "DEV.APP.SVRCONN";
-    private String connName = "localhost(1414)";
-    private String user = "admin";
-    private String password = "passw0rd";
-    private String queue = "DEV.QUEUE.1";
-
-    // Getters and setters
-    public String getQueueManager() {
-        return queueManager;
-    }
-
-    public void setQueueManager(String queueManager) {
-        this.queueManager = queueManager;
-    }
-
-    public String getChannel() {
-        return channel;
-    }
-
-    public void setChannel(String channel) {
-        this.channel = channel;
-    }
-
-    public String getConnName() {
-        return connName;
-    }
-
-    public void setConnName(String connName) {
-        this.connName = connName;
-    }
-
-    public String getUser() {
-        return user;
-    }
-
-    public void setUser(String user) {
-        this.user = user;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
-    public String getQueue() {
-        return queue;
-    }
-
-    public void setQueue(String queue) {
-        this.queue = queue;
+    public void sendMessageToNewQueue(String message) {
+        newJmsTemplate.convertAndSend("${newIBMMQ.queueName}", message);
+        System.out.println("Message sent to new Queue :: " + message);
     }
 }
 
 
 
-
-package com.example.mq.listener;
-
-import jakarta.jms.Message;
-import jakarta.jms.TextMessage;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jms.annotation.JmsListener;
 import org.springframework.stereotype.Service;
 
 @Service
-public class MqListenerService {
+public class MQListenerService {
 
-    @JmsListener(destination = "${ibm.mq.queue}")
-    public void receiveMessage(Message message) {
-        try {
-            if (message instanceof TextMessage) {
-                String text = ((TextMessage) message).getText();
-                System.out.println("Received message: " + text);
+    @Autowired
+    private MQPushService mqPushService;
 
-                // Simulate processing the message
-                System.out.println("Acknowledgement sent for message: " + text);
-            } else {
-                System.out.println("Received non-text message");
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+    @JmsListener(destination = "${IBMMQConfig.queueName}")
+    public void receiveMessage(String message) {
+        System.out.println("Message received from Queue :: " + message);
+        
+        // Push the message to the new MQ
+        mqPushService.sendMessageToNewQueue(message);
     }
 }
 
 
 
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
 
+    <groupId>com.example</groupId>
+    <artifactId>springboot-ibm-mq</artifactId>
+    <version>1.0.0</version>
 
+    <!-- Java 17 Configuration -->
+    <properties>
+        <java.version>17</java.version>
+        <spring.boot.version>3.1.0</spring.boot.version>
+    </properties>
 
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>${spring.boot.version}</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
 
-# IBM MQ Configuration
-ibm.mq.queue-manager=QM1
-ibm.mq.channel=DEV.APP.SVRCONN
-ibm.mq.conn-name=localhost(1414)
-ibm.mq.user=admin
-ibm.mq.password=passw0rd
-ibm.mq.queue=DEV.QUEUE.1
+    <dependencies>
+
+      <!-- Spring Boot JMS Starter -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jms</artifactId>
+        </dependency>
+
+        <!-- IBM MQ All Clients Library -->
+        <dependency>
+            <groupId>com.ibm.mq</groupId>
+            <artifactId>com.ibm.mq.allclient</artifactId>
+            <version>9.3.1.0</version>
+        </dependency>
+
+        <!-- Spring Boot Web (if you're exposing APIs or running a web app) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- Spring Boot Test (for unit testing your services) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Maven compiler plugin to use Java 17 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.8.1</version>
+                <configuration>
+                    <source>17</source>
+                    <target>17</target>
+                </configuration>
+            </plugin>
+
+            <!-- Spring Boot Maven plugin -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
