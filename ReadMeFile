@@ -1,141 +1,314 @@
+// WSDL Example (OrderService.wsdl)
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions 
+    name="OrderService"
+    targetNamespace="http://www.example.com/orderservice"
+    xmlns="http://schemas.xmlsoap.org/wsdl/"
+    xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+    xmlns:tns="http://www.example.com/orderservice"
+    xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    
+    <types>
+        <xsd:schema targetNamespace="http://www.example.com/orderservice">
+            <xsd:element name="ProcessOrderRequest">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="orderId" type="xsd:string"/>
+                        <xsd:element name="customerName" type="xsd:string"/>
+                        <xsd:element name="orderItems">
+                            <xsd:complexType>
+                                <xsd:sequence>
+                                    <xsd:element name="item" maxOccurs="unbounded">
+                                        <xsd:complexType>
+                                            <xsd:sequence>
+                                                <xsd:element name="productCode" type="xsd:string"/>
+                                                <xsd:element name="quantity" type="xsd:int"/>
+                                                <xsd:element name="price" type="xsd:decimal"/>
+                                            </xsd:sequence>
+                                        </xsd:complexType>
+                                    </xsd:element>
+                                </xsd:sequence>
+                            </xsd:complexType>
+                        </xsd:element>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+
+            <xsd:element name="ProcessOrderResponse">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="status" type="xsd:string"/>
+                        <xsd:element name="orderId" type="xsd:string"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+        </xsd:schema>
+    </types>
+
+    <message name="ProcessOrderInput">
+        <part name="parameters" element="tns:ProcessOrderRequest"/>
+    </message>
+
+    <message name="ProcessOrderOutput">
+        <part name="parameters" element="tns:ProcessOrderResponse"/>
+    </message>
+
+    <portType name="OrderService">
+        <operation name="ProcessOrder">
+            <input message="tns:ProcessOrderInput"/>
+            <output message="tns:ProcessOrderOutput"/>
+        </operation>
+    </portType>
+
+    <binding name="OrderServiceBinding" type="tns:OrderService">
+        <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+        <operation name="ProcessOrder">
+            <soap:operation soapAction="http://www.example.com/orderservice/ProcessOrder"/>
+            <input>
+                <soap:body use="literal"/>
+            </input>
+            <output>
+                <soap:body use="literal"/>
+            </output>
+        </operation>
+    </binding>
+
+    <service name="OrderServiceService">
+        <documentation>Order Processing Web Service</documentation>
+        <port name="OrderServicePort" binding="tns:OrderServiceBinding">
+            <soap:address location="http://localhost:8080/ws/orderService"/>
+        </port>
+    </service>
+</definitions>
+
+// Sample SOAP Request
+<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope 
+    xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" 
+    xmlns:ord="http://www.example.com/orderservice">
+    <soapenv:Header>
+        <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
+            <wsse:UsernameToken>
+                <wsse:Username>testuser</wsse:Username>
+                <wsse:Password>testpassword</wsse:Password>
+            </wsse:UsernameToken>
+        </wsse:Security>
+    </soapenv:Header>
+    <soapenv:Body>
+        <ord:ProcessOrderRequest>
+            <ord:orderId>ORD-2024-001</ord:orderId>
+            <ord:customerName>John Doe</ord:customerName>
+            <ord:orderItems>
+                <ord:item>
+                    <ord:productCode>PROD-A</ord:productCode>
+                    <ord:quantity>2</ord:quantity>
+                    <ord:price>50.00</ord:price>
+                </ord:item>
+                <ord:item>
+                    <ord:productCode>PROD-B</ord:productCode>
+                    <ord:quantity>1</ord:quantity>
+                    <ord:price>75.50</ord:price>
+                </ord:item>
+            </ord:orderItems>
+        </ord:ProcessOrderRequest>
+    </soapenv:Body>
+</soapenv:Envelope>
+
+// Java Implementation
+package com.example.soapservice.config;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.jms.core.JmsTemplate;
-import com.ibm.mq.jms.MQConnectionFactory;
-import javax.jms.JMSException;
+import org.springframework.oxm.jaxb.Jaxb2Marshaller;
+import org.springframework.ws.config.annotation.EnableWs;
+import org.springframework.ws.config.annotation.WsConfigurerAdapter;
+import org.springframework.ws.server.endpoint.adapter.method.MarshallingPayloadMethodProcessor;
+import org.springframework.ws.server.endpoint.mapping.SimpleMethodEndpointMapping;
+import org.springframework.ws.wsdl.wsdl11.DefaultWsdl11Definition;
+import org.springframework.xml.xsd.SimpleXsdSchema;
+import org.springframework.xml.xsd.XsdSchema;
 
+@EnableWs
 @Configuration
-public class NewMQConfig {
-
+public class WebServiceConfig extends WsConfigurerAdapter {
+    
     @Bean
-    public MQConnectionFactory newMQConnectionFactory() throws JMSException {
-        MQConnectionFactory factory = new MQConnectionFactory();
-        factory.setHostName("${newIBMMQ.host}");
-        factory.setPort(Integer.parseInt("${newIBMMQ.port}"));
-        factory.setChannel("${newIBMMQ.channel}");
-        factory.setQueueManager("${newIBMMQ.queueManager}");
-        return factory;
+    public Jaxb2Marshaller marshaller() {
+        Jaxb2Marshaller marshaller = new Jaxb2Marshaller();
+        // Set the packages to scan for JAXB annotated classes
+        marshaller.setPackagesToScan("com.example.soapservice.model");
+        return marshaller;
     }
 
     @Bean
-    public JmsTemplate newJmsTemplate(MQConnectionFactory newMQConnectionFactory) {
-        return new JmsTemplate(newMQConnectionFactory);
+    public XsdSchema orderSchema() {
+        return new SimpleXsdSchema(new ClassPathResource("order.xsd"));
+    }
+
+    @Bean
+    public DefaultWsdl11Definition defaultWsdl11Definition(XsdSchema orderSchema) {
+        DefaultWsdl11Definition wsdl11Definition = new DefaultWsdl11Definition();
+        wsdl11Definition.setSchema(orderSchema);
+        wsdl11Definition.setPortTypeName("OrderService");
+        wsdl11Definition.setLocationUri("/ws");
+        wsdl11Definition.setTargetNamespace("http://www.example.com/orderservice");
+        return wsdl11Definition;
     }
 }
 
+package com.example.soapservice.endpoint;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.ws.context.MessageContext;
+import org.springframework.ws.server.endpoint.annotation.Endpoint;
+import org.springframework.ws.server.endpoint.annotation.PayloadRoot;
+import org.springframework.ws.server.endpoint.annotation.RequestPayload;
+import org.springframework.ws.server.endpoint.annotation.ResponsePayload;
+import org.springframework.ws.soap.SoapHeaderElement;
+import org.springframework.ws.soap.server.endpoint.annotation.SoapHeader;
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
 
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+import java.io.StringWriter;
 
+@Endpoint
+public class OrderServiceEndpoint {
+    private static final Logger logger = LoggerFactory.getLogger(OrderServiceEndpoint.class);
+    private static final String NAMESPACE_URI = "http://www.example.com/orderservice";
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jms.core.JmsTemplate;
-import org.springframework.stereotype.Service;
+    @PayloadRoot(namespace = NAMESPACE_URI, localPart = "ProcessOrderRequest")
+    @ResponsePayload
+    public String processOrder(
+        @RequestPayload org.w3c.dom.Document requestDocument,
+        @SoapHeader SoapHeaderElement webSecurityHeader,
+        MessageContext messageContext
+    ) {
+        try {
+            // Extract and log username from security header
+            String username = extractUsername(webSecurityHeader);
+            logger.info("Processing order for user: {}", username);
 
-@Service
-public class MQPushService {
+            // Convert entire SOAP request to XML string without envelope
+            String extractedXml = extractPayloadXml(requestDocument);
+            logger.info("Extracted XML Payload: {}", extractedXml);
 
-    @Autowired
-    private JmsTemplate newJmsTemplate;
+            // Validate XML against XSD (you'd typically use a more robust validation)
+            validateXml(requestDocument);
 
-    public void sendMessageToNewQueue(String message) {
-        newJmsTemplate.convertAndSend("${newIBMMQ.queueName}", message);
-        System.out.println("Message sent to new Queue :: " + message);
+            // Return the extracted XML payload
+            return extractedXml;
+        } catch (Exception e) {
+            logger.error("Error processing order", e);
+            return "Error: " + e.getMessage();
+        }
     }
-}
 
+    private String extractUsername(SoapHeaderElement header) {
+        try {
+            // Extract username from WS-Security header
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document headerDoc = builder.parse(header.getSource().getInputSource());
+            
+            NodeList usernameNodes = headerDoc.getElementsByTagName("wsse:Username");
+            if (usernameNodes.getLength() > 0) {
+                return usernameNodes.item(0).getTextContent();
+            }
+            throw new IllegalArgumentException("Username not found in header");
+        } catch (Exception e) {
+            logger.error("Failed to extract username", e);
+            throw new RuntimeException("Username extraction failed", e);
+        }
+    }
 
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jms.annotation.JmsListener;
-import org.springframework.stereotype.Service;
-
-@Service
-public class MQListenerService {
-
-    @Autowired
-    private MQPushService mqPushService;
-
-    @JmsListener(destination = "${IBMMQConfig.queueName}")
-    public void receiveMessage(String message) {
-        System.out.println("Message received from Queue :: " + message);
+    private String extractPayloadXml(Document document) throws Exception {
+        // Find the first child of the body (the actual payload)
+        NodeList bodyChildren = document.getElementsByTagName("ord:ProcessOrderRequest");
         
-        // Push the message to the new MQ
-        mqPushService.sendMessageToNewQueue(message);
+        if (bodyChildren.getLength() == 0) {
+            throw new IllegalArgumentException("No payload found");
+        }
+
+        // Convert the payload node to a string
+        Node payloadNode = bodyChildren.item(0);
+        
+        TransformerFactory transformerFactory = TransformerFactory.newInstance();
+        Transformer transformer = transformerFactory.newTransformer();
+        transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
+        transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+        
+        StringWriter writer = new StringWriter();
+        transformer.transform(new DOMSource(payloadNode), new StreamResult(writer));
+        
+        return writer.toString();
+    }
+
+    private void validateXml(Document document) {
+        // Basic validation - you might want to use more robust XSD validation
+        try {
+            // Example of basic validation - checking required elements exist
+            NodeList orderIdNodes = document.getElementsByTagName("ord:orderId");
+            NodeList customerNameNodes = document.getElementsByTagName("ord:customerName");
+            
+            if (orderIdNodes.getLength() == 0) {
+                throw new IllegalArgumentException("Order ID is missing");
+            }
+            
+            if (customerNameNodes.getLength() == 0) {
+                throw new IllegalArgumentException("Customer Name is missing");
+            }
+        } catch (Exception e) {
+            logger.error("XML Validation failed", e);
+            throw new RuntimeException("Invalid XML payload", e);
+        }
     }
 }
 
-
-
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
-
-    <groupId>com.example</groupId>
-    <artifactId>springboot-ibm-mq</artifactId>
-    <version>1.0.0</version>
-
-    <!-- Java 17 Configuration -->
-    <properties>
-        <java.version>17</java.version>
-        <spring.boot.version>3.1.0</spring.boot.version>
-    </properties>
-
-    <parent>
+// POM Dependencies (Additional to previous example)
+/*
+<dependencies>
+    <!-- Existing dependencies -->
+    <dependency>
         <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>${spring.boot.version}</version>
-        <relativePath/> <!-- lookup parent from repository -->
-    </parent>
+        <artifactId>spring-boot-starter-web-services</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>wsdl4j</groupId>
+        <artifactId>wsdl4j</artifactId>
+    </dependency>
+</dependencies>
 
-    <dependencies>
-
-      <!-- Spring Boot JMS Starter -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-jms</artifactId>
-        </dependency>
-
-        <!-- IBM MQ All Clients Library -->
-        <dependency>
-            <groupId>com.ibm.mq</groupId>
-            <artifactId>com.ibm.mq.allclient</artifactId>
-            <version>9.3.1.0</version>
-        </dependency>
-
-        <!-- Spring Boot Web (if you're exposing APIs or running a web app) -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
-        </dependency>
-
-        <!-- Spring Boot Test (for unit testing your services) -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-    </dependencies>
-
-    <build>
-        <plugins>
-            <!-- Maven compiler plugin to use Java 17 -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.8.1</version>
-                <configuration>
-                    <source>17</source>
-                    <target>17</target>
-                </configuration>
-            </plugin>
-
-            <!-- Spring Boot Maven plugin -->
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-            </plugin>
-        </plugins>
-    </build>
-</project>
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.jvnet.jaxb2.maven2</groupId>
+            <artifactId>maven-jaxb2-plugin</artifactId>
+            <executions>
+                <execution>
+                    <goals>
+                        <goal>generate</goal>
+                    </goals>
+                </execution>
+            </executions>
+            <configuration>
+                <schemaLanguage>WSDL</schemaLanguage>
+                <generatePackage>com.example.soapservice.model</generatePackage>
+                <schemas>
+                    <schema>
+                        <url>${project.basedir}/src/main/resources/OrderService.wsdl</url>
+                    </schema>
+                </schemas>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
+*/
