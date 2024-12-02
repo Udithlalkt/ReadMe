@@ -1,162 +1,14 @@
-// WSDL Example (OrderService.wsdl)
-<?xml version="1.0" encoding="UTF-8"?>
-<definitions 
-    name="OrderService"
-    targetNamespace="http://www.example.com/orderservice"
-    xmlns="http://schemas.xmlsoap.org/wsdl/"
-    xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
-    xmlns:tns="http://www.example.com/orderservice"
-    xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-    
-    <types>
-        <xsd:schema targetNamespace="http://www.example.com/orderservice">
-            <xsd:element name="ProcessOrderRequest">
-                <xsd:complexType>
-                    <xsd:sequence>
-                        <xsd:element name="orderId" type="xsd:string"/>
-                        <xsd:element name="customerName" type="xsd:string"/>
-                        <xsd:element name="orderItems">
-                            <xsd:complexType>
-                                <xsd:sequence>
-                                    <xsd:element name="item" maxOccurs="unbounded">
-                                        <xsd:complexType>
-                                            <xsd:sequence>
-                                                <xsd:element name="productCode" type="xsd:string"/>
-                                                <xsd:element name="quantity" type="xsd:int"/>
-                                                <xsd:element name="price" type="xsd:decimal"/>
-                                            </xsd:sequence>
-                                        </xsd:complexType>
-                                    </xsd:element>
-                                </xsd:sequence>
-                            </xsd:complexType>
-                        </xsd:element>
-                    </xsd:sequence>
-                </xsd:complexType>
-            </xsd:element>
-
-            <xsd:element name="ProcessOrderResponse">
-                <xsd:complexType>
-                    <xsd:sequence>
-                        <xsd:element name="status" type="xsd:string"/>
-                        <xsd:element name="orderId" type="xsd:string"/>
-                    </xsd:sequence>
-                </xsd:complexType>
-            </xsd:element>
-        </xsd:schema>
-    </types>
-
-    <message name="ProcessOrderInput">
-        <part name="parameters" element="tns:ProcessOrderRequest"/>
-    </message>
-
-    <message name="ProcessOrderOutput">
-        <part name="parameters" element="tns:ProcessOrderResponse"/>
-    </message>
-
-    <portType name="OrderService">
-        <operation name="ProcessOrder">
-            <input message="tns:ProcessOrderInput"/>
-            <output message="tns:ProcessOrderOutput"/>
-        </operation>
-    </portType>
-
-    <binding name="OrderServiceBinding" type="tns:OrderService">
-        <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
-        <operation name="ProcessOrder">
-            <soap:operation soapAction="http://www.example.com/orderservice/ProcessOrder"/>
-            <input>
-                <soap:body use="literal"/>
-            </input>
-            <output>
-                <soap:body use="literal"/>
-            </output>
-        </operation>
-    </binding>
-
-    <service name="OrderServiceService">
-        <documentation>Order Processing Web Service</documentation>
-        <port name="OrderServicePort" binding="tns:OrderServiceBinding">
-            <soap:address location="http://localhost:8080/ws/orderService"/>
-        </port>
-    </service>
-</definitions>
-
-// Sample SOAP Request
-<?xml version="1.0" encoding="UTF-8"?>
-<soapenv:Envelope 
-    xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" 
-    xmlns:ord="http://www.example.com/orderservice">
-    <soapenv:Header>
-        <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
-            <wsse:UsernameToken>
-                <wsse:Username>testuser</wsse:Username>
-                <wsse:Password>testpassword</wsse:Password>
-            </wsse:UsernameToken>
-        </wsse:Security>
-    </soapenv:Header>
-    <soapenv:Body>
-        <ord:ProcessOrderRequest>
-            <ord:orderId>ORD-2024-001</ord:orderId>
-            <ord:customerName>John Doe</ord:customerName>
-            <ord:orderItems>
-                <ord:item>
-                    <ord:productCode>PROD-A</ord:productCode>
-                    <ord:quantity>2</ord:quantity>
-                    <ord:price>50.00</ord:price>
-                </ord:item>
-                <ord:item>
-                    <ord:productCode>PROD-B</ord:productCode>
-                    <ord:quantity>1</ord:quantity>
-                    <ord:price>75.50</ord:price>
-                </ord:item>
-            </ord:orderItems>
-        </ord:ProcessOrderRequest>
-    </soapenv:Body>
-</soapenv:Envelope>
-
-// Java Implementation
-package com.example.soapservice.config;
-
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.oxm.jaxb.Jaxb2Marshaller;
-import org.springframework.ws.config.annotation.EnableWs;
-import org.springframework.ws.config.annotation.WsConfigurerAdapter;
-import org.springframework.ws.server.endpoint.adapter.method.MarshallingPayloadMethodProcessor;
-import org.springframework.ws.server.endpoint.mapping.SimpleMethodEndpointMapping;
-import org.springframework.ws.wsdl.wsdl11.DefaultWsdl11Definition;
-import org.springframework.xml.xsd.SimpleXsdSchema;
-import org.springframework.xml.xsd.XsdSchema;
-
-@EnableWs
-@Configuration
-public class WebServiceConfig extends WsConfigurerAdapter {
-    
-    @Bean
-    public Jaxb2Marshaller marshaller() {
-        Jaxb2Marshaller marshaller = new Jaxb2Marshaller();
-        // Set the packages to scan for JAXB annotated classes
-        marshaller.setPackagesToScan("com.example.soapservice.model");
-        return marshaller;
-    }
-
-    @Bean
-    public XsdSchema orderSchema() {
-        return new SimpleXsdSchema(new ClassPathResource("order.xsd"));
-    }
-
-    @Bean
-    public DefaultWsdl11Definition defaultWsdl11Definition(XsdSchema orderSchema) {
-        DefaultWsdl11Definition wsdl11Definition = new DefaultWsdl11Definition();
-        wsdl11Definition.setSchema(orderSchema);
-        wsdl11Definition.setPortTypeName("OrderService");
-        wsdl11Definition.setLocationUri("/ws");
-        wsdl11Definition.setTargetNamespace("http://www.example.com/orderservice");
-        return wsdl11Definition;
-    }
-}
-
 package com.example.soapservice.endpoint;
+
+import jakarta.xml.bind.annotation.XmlElement;
+import jakarta.xml.bind.annotation.XmlRootElement;
+import jakarta.xml.parsers.DocumentBuilder;
+import jakarta.xml.parsers.DocumentBuilderFactory;
+import jakarta.xml.transform.OutputKeys;
+import jakarta.xml.transform.Transformer;
+import jakarta.xml.transform.TransformerFactory;
+import jakarta.xml.transform.dom.DOMSource;
+import jakarta.xml.transform.stream.StreamResult;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -171,14 +23,9 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.transform.OutputKeys;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
 import java.io.StringWriter;
+import java.math.BigDecimal;
+import java.util.List;
 
 @Endpoint
 public class OrderServiceEndpoint {
@@ -188,7 +35,7 @@ public class OrderServiceEndpoint {
     @PayloadRoot(namespace = NAMESPACE_URI, localPart = "ProcessOrderRequest")
     @ResponsePayload
     public String processOrder(
-        @RequestPayload org.w3c.dom.Document requestDocument,
+        @RequestPayload Document requestDocument,
         @SoapHeader SoapHeaderElement webSecurityHeader,
         MessageContext messageContext
     ) {
@@ -208,18 +55,18 @@ public class OrderServiceEndpoint {
             return extractedXml;
         } catch (Exception e) {
             logger.error("Error processing order", e);
-            return "Error: " + e.getMessage();
+            return STR."Error: \{e.getMessage()}"; // Java 17 string template
         }
     }
 
     private String extractUsername(SoapHeaderElement header) {
         try {
             // Extract username from WS-Security header
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            DocumentBuilder builder = factory.newDocumentBuilder();
-            Document headerDoc = builder.parse(header.getSource().getInputSource());
+            var factory = DocumentBuilderFactory.newInstance();
+            var builder = factory.newDocumentBuilder();
+            var headerDoc = builder.parse(header.getSource().getInputSource());
             
-            NodeList usernameNodes = headerDoc.getElementsByTagName("wsse:Username");
+            var usernameNodes = headerDoc.getElementsByTagName("wsse:Username");
             if (usernameNodes.getLength() > 0) {
                 return usernameNodes.item(0).getTextContent();
             }
@@ -232,21 +79,21 @@ public class OrderServiceEndpoint {
 
     private String extractPayloadXml(Document document) throws Exception {
         // Find the first child of the body (the actual payload)
-        NodeList bodyChildren = document.getElementsByTagName("ord:ProcessOrderRequest");
+        var bodyChildren = document.getElementsByTagName("ord:ProcessOrderRequest");
         
         if (bodyChildren.getLength() == 0) {
             throw new IllegalArgumentException("No payload found");
         }
 
         // Convert the payload node to a string
-        Node payloadNode = bodyChildren.item(0);
+        var payloadNode = bodyChildren.item(0);
         
-        TransformerFactory transformerFactory = TransformerFactory.newInstance();
-        Transformer transformer = transformerFactory.newTransformer();
+        var transformerFactory = TransformerFactory.newInstance();
+        var transformer = transformerFactory.newTransformer();
         transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
         transformer.setOutputProperty(OutputKeys.INDENT, "yes");
         
-        StringWriter writer = new StringWriter();
+        var writer = new StringWriter();
         transformer.transform(new DOMSource(payloadNode), new StreamResult(writer));
         
         return writer.toString();
@@ -256,8 +103,8 @@ public class OrderServiceEndpoint {
         // Basic validation - you might want to use more robust XSD validation
         try {
             // Example of basic validation - checking required elements exist
-            NodeList orderIdNodes = document.getElementsByTagName("ord:orderId");
-            NodeList customerNameNodes = document.getElementsByTagName("ord:customerName");
+            var orderIdNodes = document.getElementsByTagName("ord:orderId");
+            var customerNameNodes = document.getElementsByTagName("ord:customerName");
             
             if (orderIdNodes.getLength() == 0) {
                 throw new IllegalArgumentException("Order ID is missing");
@@ -271,44 +118,113 @@ public class OrderServiceEndpoint {
             throw new RuntimeException("Invalid XML payload", e);
         }
     }
+
+    // Data Model Classes with Jakarta XML Binding
+    @XmlRootElement(name = "ProcessOrderRequest")
+    public static class ProcessOrderRequest {
+        private String orderId;
+        private String customerName;
+        private List<OrderItem> orderItems;
+
+        @XmlElement(name = "orderId")
+        public String getOrderId() {
+            return orderId;
+        }
+
+        public void setOrderId(String orderId) {
+            this.orderId = orderId;
+        }
+
+        @XmlElement(name = "customerName")
+        public String getCustomerName() {
+            return customerName;
+        }
+
+        public void setCustomerName(String customerName) {
+            this.customerName = customerName;
+        }
+
+        @XmlElement(name = "orderItems")
+        public List<OrderItem> getOrderItems() {
+            return orderItems;
+        }
+
+        public void setOrderItems(List<OrderItem> orderItems) {
+            this.orderItems = orderItems;
+        }
+    }
+
+    public static class OrderItem {
+        private String productCode;
+        private int quantity;
+        private BigDecimal price;
+
+        @XmlElement(name = "productCode")
+        public String getProductCode() {
+            return productCode;
+        }
+
+        public void setProductCode(String productCode) {
+            this.productCode = productCode;
+        }
+
+        @XmlElement(name = "quantity")
+        public int getQuantity() {
+            return quantity;
+        }
+
+        public void setQuantity(int quantity) {
+            this.quantity = quantity;
+        }
+
+        @XmlElement(name = "price")
+        public BigDecimal getPrice() {
+            return price;
+        }
+
+        public void setPrice(BigDecimal price) {
+            this.price = price;
+        }
+    }
 }
 
-// POM Dependencies (Additional to previous example)
-/*
-<dependencies>
-    <!-- Existing dependencies -->
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-web-services</artifactId>
-    </dependency>
-    <dependency>
-        <groupId>wsdl4j</groupId>
-        <artifactId>wsdl4j</artifactId>
-    </dependency>
-</dependencies>
+// Configuration Class
+package com.example.soapservice.config;
 
-<build>
-    <plugins>
-        <plugin>
-            <groupId>org.jvnet.jaxb2.maven2</groupId>
-            <artifactId>maven-jaxb2-plugin</artifactId>
-            <executions>
-                <execution>
-                    <goals>
-                        <goal>generate</goal>
-                    </goals>
-                </execution>
-            </executions>
-            <configuration>
-                <schemaLanguage>WSDL</schemaLanguage>
-                <generatePackage>com.example.soapservice.model</generatePackage>
-                <schemas>
-                    <schema>
-                        <url>${project.basedir}/src/main/resources/OrderService.wsdl</url>
-                    </schema>
-                </schemas>
-            </configuration>
-        </plugin>
-    </plugins>
-</build>
-*/
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.oxm.jaxb.Jaxb2Marshaller;
+import org.springframework.ws.config.annotation.EnableWs;
+import org.springframework.ws.config.annotation.WsConfigurerAdapter;
+import org.springframework.ws.wsdl.wsdl11.DefaultWsdl11Definition;
+import org.springframework.xml.xsd.SimpleXsdSchema;
+import org.springframework.xml.xsd.XsdSchema;
+
+@EnableWs
+@Configuration
+public class WebServiceConfig extends WsConfigurerAdapter {
+    
+    @Bean
+    public Jaxb2Marshaller marshaller() {
+        var marshaller = new Jaxb2Marshaller();
+        // Set the packages to scan for Jakarta XML Binding annotated classes
+        marshaller.setPackagesToScan("com.example.soapservice.endpoint");
+        return marshaller;
+    }
+
+    @Bean
+    public XsdSchema orderSchema() {
+        return new SimpleXsdSchema(new ClassPathResource("order.xsd"));
+    }
+
+    @Bean
+    public DefaultWsdl11Definition defaultWsdl11Definition(XsdSchema orderSchema) {
+        var wsdl11Definition = new DefaultWsdl11Definition();
+        wsdl11Definition.setSchema(orderSchema);
+        wsdl11Definition.setPortTypeName("OrderService");
+        wsdl11Definition.setLocationUri("/ws");
+        wsdl11Definition.setTargetNamespace("http://www.example.com/orderservice");
+        return wsdl11Definition;
+    }
+}
