@@ -1,230 +1,58 @@
-package com.example.soapservice.endpoint;
+<dependencies>
+    <!-- Spring Boot Web Services -->
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web-services</artifactId>
+        <exclusions>
+            <!-- Exclude old javax dependencies -->
+            <exclusion>
+                <groupId>javax.xml.bind</groupId>
+                <artifactId>jaxb-api</artifactId>
+            </exclusion>
+        </exclusions>
+    </dependency>
 
-import jakarta.xml.bind.annotation.XmlElement;
-import jakarta.xml.bind.annotation.XmlRootElement;
-import jakarta.xml.parsers.DocumentBuilder;
-import jakarta.xml.parsers.DocumentBuilderFactory;
-import jakarta.xml.transform.OutputKeys;
-import jakarta.xml.transform.Transformer;
-import jakarta.xml.transform.TransformerFactory;
-import jakarta.xml.transform.dom.DOMSource;
-import jakarta.xml.transform.stream.StreamResult;
+    <!-- Jakarta XML Binding -->
+    <dependency>
+        <groupId>jakarta.xml.bind</groupId>
+        <artifactId>jakarta.xml.bind-api</artifactId>
+        <version>4.0.1</version>
+    </dependency>
+    <dependency>
+        <groupId>org.glassfish.jaxb</groupId>
+        <artifactId>jaxb-runtime</artifactId>
+        <version>4.0.3</version>
+    </dependency>
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.ws.context.MessageContext;
-import org.springframework.ws.server.endpoint.annotation.Endpoint;
-import org.springframework.ws.server.endpoint.annotation.PayloadRoot;
-import org.springframework.ws.server.endpoint.annotation.RequestPayload;
-import org.springframework.ws.server.endpoint.annotation.ResponsePayload;
-import org.springframework.ws.soap.SoapHeaderElement;
-import org.springframework.ws.soap.server.endpoint.annotation.SoapHeader;
-import org.w3c.dom.Document;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
+    <!-- WSDL Support -->
+    <dependency>
+        <groupId>wsdl4j</groupId>
+        <artifactId>wsdl4j</artifactId>
+    </dependency>
+</dependencies>
 
-import java.io.StringWriter;
-import java.math.BigDecimal;
-import java.util.List;
-
-@Endpoint
-public class OrderServiceEndpoint {
-    private static final Logger logger = LoggerFactory.getLogger(OrderServiceEndpoint.class);
-    private static final String NAMESPACE_URI = "http://www.example.com/orderservice";
-
-    @PayloadRoot(namespace = NAMESPACE_URI, localPart = "ProcessOrderRequest")
-    @ResponsePayload
-    public String processOrder(
-        @RequestPayload Document requestDocument,
-        @SoapHeader SoapHeaderElement webSecurityHeader,
-        MessageContext messageContext
-    ) {
-        try {
-            // Extract and log username from security header
-            String username = extractUsername(webSecurityHeader);
-            logger.info("Processing order for user: {}", username);
-
-            // Convert entire SOAP request to XML string without envelope
-            String extractedXml = extractPayloadXml(requestDocument);
-            logger.info("Extracted XML Payload: {}", extractedXml);
-
-            // Validate XML against XSD (you'd typically use a more robust validation)
-            validateXml(requestDocument);
-
-            // Return the extracted XML payload
-            return extractedXml;
-        } catch (Exception e) {
-            logger.error("Error processing order", e);
-            return STR."Error: \{e.getMessage()}"; // Java 17 string template
-        }
-    }
-
-    private String extractUsername(SoapHeaderElement header) {
-        try {
-            // Extract username from WS-Security header
-            var factory = DocumentBuilderFactory.newInstance();
-            var builder = factory.newDocumentBuilder();
-            var headerDoc = builder.parse(header.getSource().getInputSource());
-            
-            var usernameNodes = headerDoc.getElementsByTagName("wsse:Username");
-            if (usernameNodes.getLength() > 0) {
-                return usernameNodes.item(0).getTextContent();
-            }
-            throw new IllegalArgumentException("Username not found in header");
-        } catch (Exception e) {
-            logger.error("Failed to extract username", e);
-            throw new RuntimeException("Username extraction failed", e);
-        }
-    }
-
-    private String extractPayloadXml(Document document) throws Exception {
-        // Find the first child of the body (the actual payload)
-        var bodyChildren = document.getElementsByTagName("ord:ProcessOrderRequest");
-        
-        if (bodyChildren.getLength() == 0) {
-            throw new IllegalArgumentException("No payload found");
-        }
-
-        // Convert the payload node to a string
-        var payloadNode = bodyChildren.item(0);
-        
-        var transformerFactory = TransformerFactory.newInstance();
-        var transformer = transformerFactory.newTransformer();
-        transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
-        transformer.setOutputProperty(OutputKeys.INDENT, "yes");
-        
-        var writer = new StringWriter();
-        transformer.transform(new DOMSource(payloadNode), new StreamResult(writer));
-        
-        return writer.toString();
-    }
-
-    private void validateXml(Document document) {
-        // Basic validation - you might want to use more robust XSD validation
-        try {
-            // Example of basic validation - checking required elements exist
-            var orderIdNodes = document.getElementsByTagName("ord:orderId");
-            var customerNameNodes = document.getElementsByTagName("ord:customerName");
-            
-            if (orderIdNodes.getLength() == 0) {
-                throw new IllegalArgumentException("Order ID is missing");
-            }
-            
-            if (customerNameNodes.getLength() == 0) {
-                throw new IllegalArgumentException("Customer Name is missing");
-            }
-        } catch (Exception e) {
-            logger.error("XML Validation failed", e);
-            throw new RuntimeException("Invalid XML payload", e);
-        }
-    }
-
-    // Data Model Classes with Jakarta XML Binding
-    @XmlRootElement(name = "ProcessOrderRequest")
-    public static class ProcessOrderRequest {
-        private String orderId;
-        private String customerName;
-        private List<OrderItem> orderItems;
-
-        @XmlElement(name = "orderId")
-        public String getOrderId() {
-            return orderId;
-        }
-
-        public void setOrderId(String orderId) {
-            this.orderId = orderId;
-        }
-
-        @XmlElement(name = "customerName")
-        public String getCustomerName() {
-            return customerName;
-        }
-
-        public void setCustomerName(String customerName) {
-            this.customerName = customerName;
-        }
-
-        @XmlElement(name = "orderItems")
-        public List<OrderItem> getOrderItems() {
-            return orderItems;
-        }
-
-        public void setOrderItems(List<OrderItem> orderItems) {
-            this.orderItems = orderItems;
-        }
-    }
-
-    public static class OrderItem {
-        private String productCode;
-        private int quantity;
-        private BigDecimal price;
-
-        @XmlElement(name = "productCode")
-        public String getProductCode() {
-            return productCode;
-        }
-
-        public void setProductCode(String productCode) {
-            this.productCode = productCode;
-        }
-
-        @XmlElement(name = "quantity")
-        public int getQuantity() {
-            return quantity;
-        }
-
-        public void setQuantity(int quantity) {
-            this.quantity = quantity;
-        }
-
-        @XmlElement(name = "price")
-        public BigDecimal getPrice() {
-            return price;
-        }
-
-        public void setPrice(BigDecimal price) {
-            this.price = price;
-        }
-    }
-}
-
-// Configuration Class
-package com.example.soapservice.config;
-
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.oxm.jaxb.Jaxb2Marshaller;
-import org.springframework.ws.config.annotation.EnableWs;
-import org.springframework.ws.config.annotation.WsConfigurerAdapter;
-import org.springframework.ws.wsdl.wsdl11.DefaultWsdl11Definition;
-import org.springframework.xml.xsd.SimpleXsdSchema;
-import org.springframework.xml.xsd.XsdSchema;
-
-@EnableWs
-@Configuration
-public class WebServiceConfig extends WsConfigurerAdapter {
-    
-    @Bean
-    public Jaxb2Marshaller marshaller() {
-        var marshaller = new Jaxb2Marshaller();
-        // Set the packages to scan for Jakarta XML Binding annotated classes
-        marshaller.setPackagesToScan("com.example.soapservice.endpoint");
-        return marshaller;
-    }
-
-    @Bean
-    public XsdSchema orderSchema() {
-        return new SimpleXsdSchema(new ClassPathResource("order.xsd"));
-    }
-
-    @Bean
-    public DefaultWsdl11Definition defaultWsdl11Definition(XsdSchema orderSchema) {
-        var wsdl11Definition = new DefaultWsdl11Definition();
-        wsdl11Definition.setSchema(orderSchema);
-        wsdl11Definition.setPortTypeName("OrderService");
-        wsdl11Definition.setLocationUri("/ws");
-        wsdl11Definition.setTargetNamespace("http://www.example.com/orderservice");
-        return wsdl11Definition;
-    }
-}
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.jvnet.jaxb2.maven2</groupId>
+            <artifactId>maven-jaxb2-plugin</artifactId>
+            <version>0.14.0</version>
+            <executions>
+                <execution>
+                    <goals>
+                        <goal>generate</goal>
+                    </goals>
+                </execution>
+            </executions>
+            <configuration>
+                <schemaLanguage>WSDL</schemaLanguage>
+                <generatePackage>com.example.soapservice.model</generatePackage>
+                <schemas>
+                    <schema>
+                        <url>${project.basedir}/src/main/resources/OrderService.wsdl</url>
+                    </schema>
+                </schemas>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
