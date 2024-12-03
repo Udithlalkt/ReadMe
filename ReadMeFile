@@ -1,58 +1,184 @@
+
 <dependencies>
-    <!-- Spring Boot Web Services -->
+    <!-- Spring Boot Starter for SOAP Web Services -->
     <dependency>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-web-services</artifactId>
-        <exclusions>
-            <!-- Exclude old javax dependencies -->
-            <exclusion>
-                <groupId>javax.xml.bind</groupId>
-                <artifactId>jaxb-api</artifactId>
-            </exclusion>
-        </exclusions>
     </dependency>
 
-    <!-- Jakarta XML Binding -->
-    <dependency>
-        <groupId>jakarta.xml.bind</groupId>
-        <artifactId>jakarta.xml.bind-api</artifactId>
-        <version>4.0.1</version>
-    </dependency>
+    <!-- JAXB Runtime for XML binding -->
     <dependency>
         <groupId>org.glassfish.jaxb</groupId>
         <artifactId>jaxb-runtime</artifactId>
-        <version>4.0.3</version>
+        <scope>runtime</scope>
     </dependency>
 
-    <!-- WSDL Support -->
+    <!-- Logging -->
     <dependency>
-        <groupId>wsdl4j</groupId>
-        <artifactId>wsdl4j</artifactId>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-logging</artifactId>
     </dependency>
 </dependencies>
 
-<build>
-    <plugins>
-        <plugin>
-            <groupId>org.jvnet.jaxb2.maven2</groupId>
-            <artifactId>maven-jaxb2-plugin</artifactId>
-            <version>0.14.0</version>
-            <executions>
-                <execution>
-                    <goals>
-                        <goal>generate</goal>
-                    </goals>
-                </execution>
-            </executions>
-            <configuration>
-                <schemaLanguage>WSDL</schemaLanguage>
-                <generatePackage>com.example.soapservice.model</generatePackage>
-                <schemas>
-                    <schema>
-                        <url>${project.basedir}/src/main/resources/OrderService.wsdl</url>
-                    </schema>
-                </schemas>
-            </configuration>
-        </plugin>
-    </plugins>
-</build>
+
+
+
+
+package com.example.soapservice.config;
+
+import org.springframework.boot.web.servlet.ServletRegistrationBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.ws.transport.http.MessageDispatcherServlet;
+import org.springframework.ws.wsdl.wsdl11.DefaultWsdl11Definition;
+import org.springframework.xml.xsd.SimpleXsdSchema;
+import org.springframework.xml.xsd.XsdSchema;
+
+@Configuration
+public class WebServiceConfig {
+
+    @Bean
+    public ServletRegistrationBean<MessageDispatcherServlet> messageDispatcherServlet() {
+        MessageDispatcherServlet servlet = new MessageDispatcherServlet();
+        servlet.setTransformWsdlLocations(true);
+        return new ServletRegistrationBean<>(servlet, "/test/soapservice/*");
+    }
+
+    @Bean(name = "testService")
+    public DefaultWsdl11Definition defaultWsdl11Definition(XsdSchema testRequestSchema) {
+        DefaultWsdl11Definition definition = new DefaultWsdl11Definition();
+        definition.setPortTypeName("TestServicePort");
+        definition.setLocationUri("/test/soapservice");
+        definition.setTargetNamespace("http://example.com/soapservice");
+        definition.setSchema(testRequestSchema);
+        return definition;
+    }
+
+    @Bean
+    public XsdSchema testRequestSchema() {
+        return new SimpleXsdSchema(new org.springframework.core.io.ClassPathResource("xsd/testRequest.xsd"));
+    }
+}
+
+
+
+
+
+
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://example.com/soapservice">
+    <xs:element name="TestRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="name" type="xs:string" />
+                <xs:element name="age" type="xs:int" />
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="TestResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="status" type="xs:string" />
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+</xs:schema>
+
+
+
+
+
+<definitions xmlns="http://schemas.xmlsoap.org/wsdl/"
+             xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+             xmlns:tns="http://example.com/soapservice"
+             xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+             targetNamespace="http://example.com/soapservice">
+
+    <types>
+        <xsd:schema>
+            <xsd:import namespace="http://example.com/soapservice" schemaLocation="testRequest.xsd" />
+        </xsd:schema>
+    </types>
+
+    <message name="TestRequest">
+        <part name="parameters" element="tns:TestRequest" />
+    </message>
+
+    <message name="TestResponse">
+        <part name="parameters" element="tns:TestResponse" />
+    </message>
+
+    <portType name="TestServicePort">
+        <operation name="processTestRequest">
+            <input message="tns:TestRequest" />
+            <output message="tns:TestResponse" />
+        </operation>
+    </portType>
+
+    <binding name="TestServiceBinding" type="tns:TestServicePort">
+        <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http" />
+        <operation name="processTestRequest">
+            <soap:operation soapAction="http://example.com/soapservice/processTestRequest" />
+            <input>
+                <soap:body use="literal" />
+            </input>
+            <output>
+                <soap:body use="literal" />
+            </output>
+        </operation>
+    </binding>
+
+    <service name="TestService">
+        <port name="TestServicePort" binding="tns:TestServiceBinding">
+            <soap:address location="http://localhost:8080/test/soapservice" />
+        </port>
+    </service>
+</definitions>
+
+
+
+
+
+package com.example.soapservice.endpoint;
+
+import org.springframework.ws.server.endpoint.annotation.Endpoint;
+import org.springframework.ws.server.endpoint.annotation.PayloadRoot;
+import org.springframework.ws.server.endpoint.annotation.ResponsePayload;
+import org.springframework.ws.server.endpoint.annotation.RequestPayload;
+
+import javax.xml.validation.SchemaFactory;
+import javax.xml.transform.Source;
+import javax.xml.transform.stream.StreamSource;
+import javax.xml.validation.Validator;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+
+import org.springframework.xml.transform.StringResult;
+
+@Endpoint
+public class TestSoapServiceEndpoint {
+
+    private static final String NAMESPACE_URI = "http://example.com/soapservice";
+
+    @PayloadRoot(namespace = NAMESPACE_URI, localPart = "TestRequest")
+    @ResponsePayload
+    public Source handleTestRequest(@RequestPayload Source requestPayload) {
+        try {
+            // Validate request against the schema
+            Validator validator = SchemaFactory
+                .newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI)
+                .newSchema(new StreamSource("classpath:/xsd/testRequest.xsd"))
+                .newValidator();
+
+            validator.validate(requestPayload);
+
+            // Create a success response
+            StringResult response = new StringResult();
+            response.write("<TestResponse xmlns='http://example.com/soapservice'><status>Success</status></TestResponse>");
+            return new StreamSource(new StringReader(response.toString()));
+
+        } catch (Exception e) {
+            throw new RuntimeException("Request validation failed: " + e.getMessage());
+        }
+    }
+}
+
