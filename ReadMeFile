@@ -1,6 +1,132 @@
-<TestRequest xmlns="http://example.com/soapservice">
-    <name>John</name>
-    <age>30</age>
-</TestRequest>
+@Endpoint
+public class NameAgeServiceEndpoint {
+
+    private static final String NAMESPACE_URI = "http://example.com/soapservice";
+
+    private static final Logger logger = LoggerFactory.getLogger(NameAgeServiceEndpoint.class);
+
+    @PayloadRoot(namespace = NAMESPACE_URI, localPart = "NameAgeRequest")
+    @ResponsePayload
+    public JAXBElement<NameAgeResponse> handleRequest(
+            @RequestPayload Element soapBodyElement, 
+            @SoapHeader(value = "{http://schemas.xmlsoap.org/ws/2003/06/secext}Security") Element soapHeader) {
+        try {
+            // Extract username from SOAP header
+            String username = extractUsername(soapHeader);
+            logger.info("Processing request for user: {}", username);
+
+            // Extract and validate XML payload
+            String payloadXml = extractPayloadXml(soapBodyElement);
+            validateAgainstXsd(payloadXml);
+            logger.info("Payload validation successful.");
+
+            // Create response object
+            NameAgeResponse response = new NameAgeResponse();
+            response.setStatus("Success");
+            return new JAXBElement<>(new QName(NAMESPACE_URI, "NameAgeResponse"), NameAgeResponse.class, response);
+        } catch (Exception e) {
+            logger.error("Error processing SOAP request", e);
+            throw new RuntimeException("Failed to process SOAP request");
+        }
+    }
+
+    private String extractUsername(Element soapHeader) throws Exception {
+        // Extract username from WS-Security header
+        NodeList usernameNodes = soapHeader.getElementsByTagNameNS(
+                "http://schemas.xmlsoap.org/ws/2003/06/secext", "Username");
+        if (usernameNodes.getLength() > 0) {
+            return usernameNodes.item(0).getTextContent();
+        } else {
+            throw new IllegalArgumentException("Username not found in header");
+        }
+    }
+
+    private String extractPayloadXml(Element soapBodyElement) throws Exception {
+        // Extract and convert SOAP body payload to XML string
+        Transformer transformer = TransformerFactory.newInstance().newTransformer();
+        StringWriter writer = new StringWriter();
+        transformer.transform(new DOMSource(soapBodyElement), new StreamResult(writer));
+        return writer.toString();
+    }
+
+    private void validateAgainstXsd(String payloadXml) {
+        try {
+            SchemaFactory factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
+            Schema schema = factory.newSchema(new ClassPathResource("xsd/name-age.xsd").getFile());
+
+            Validator validator = schema.newValidator();
+            validator.validate(new StreamSource(new StringReader(payloadXml)));
+
+            logger.info("XML is valid against the XSD.");
+        } catch (IOException | SAXException e) {
+            throw new IllegalArgumentException("Invalid XML: " + e.getMessage(), e);
+        }
+    }
+}
+
+
+
+
+
+
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="http://example.com/soapservice" targetNamespace="http://example.com/soapservice" elementFormDefault="qualified">
+    <xs:element name="NameAgeRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="Name" type="xs:string" minOccurs="1" maxOccurs="1"/>
+                <xs:element name="Age" type="xs:int" minOccurs="1" maxOccurs="1"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="NameAgeResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="Status" type="xs:string" minOccurs="1" maxOccurs="1"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+</xs:schema>
+
+
+
+
+
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web-services</artifactId>
+</dependency>
+<dependency>
+    <groupId>javax.xml.bind</groupId>
+    <artifactId>jaxb-api</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.glassfish.jaxb</groupId>
+    <artifactId>jaxb-runtime</artifactId>
+</dependency>
+<dependency>
+    <groupId>xerces</groupId>
+    <artifactId>xercesImpl</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.springframework</groupId>
+    <artifactId>spring-context</artifactId>
+</dependency>
+
+
+
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://example.com/soapservice">
+   <soapenv:Header>
+      <wsse:Security xmlns:wsse="http://schemas.xmlsoap.org/ws/2003/06/secext">
+         <wsse:Username>testuser</wsse:Username>
+      </wsse:Security>
+   </soapenv:Header>
+   <soapenv:Body>
+      <ns:NameAgeRequest>
+         <ns:Name>John Doe</ns:Name>
+         <ns:Age>30</ns:Age>
+      </ns:NameAgeRequest>
+   </soapenv:Body>
+</soapenv:Envelope>
 
 
