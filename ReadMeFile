@@ -1,44 +1,6 @@
-package com.example.soapservice.endpoint;
+<TestRequest xmlns="http://example.com/soapservice">
+    <name>John</name>
+    <age>30</age>
+</TestRequest>
 
-import org.springframework.ws.server.endpoint.annotation.Endpoint;
-import org.springframework.ws.server.endpoint.annotation.PayloadRoot;
-import org.springframework.ws.server.endpoint.annotation.RequestPayload;
-import org.springframework.ws.server.endpoint.annotation.ResponsePayload;
 
-import javax.xml.transform.Source;
-import javax.xml.transform.stream.StreamSource;
-import javax.xml.validation.SchemaFactory;
-import javax.xml.XMLConstants;
-import java.io.StringReader;
-import java.io.StringWriter;
-
-@Endpoint
-public class TestSoapServiceEndpoint {
-
-    private static final String NAMESPACE_URI = "http://example.com/soapservice";
-
-    @PayloadRoot(namespace = NAMESPACE_URI, localPart = "TestRequest")
-    @ResponsePayload
-    public Source handleTestRequest(@RequestPayload Source requestPayload) {
-        try {
-            // Validate request against the schema
-            SchemaFactory schemaFactory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
-            var schema = schemaFactory.newSchema(new StreamSource(getClass().getResourceAsStream("/xsd/testRequest.xsd")));
-            var validator = schema.newValidator();
-            validator.validate(requestPayload);
-
-            // Create a success response XML string
-            String responseXml = """
-                <TestResponse xmlns="http://example.com/soapservice">
-                    <status>Success</status>
-                </TestResponse>
-            """;
-
-            // Return the response as a Source
-            return new StreamSource(new StringReader(responseXml));
-
-        } catch (Exception e) {
-            throw new RuntimeException("Request validation failed: " + e.getMessage(), e);
-        }
-    }
-}
