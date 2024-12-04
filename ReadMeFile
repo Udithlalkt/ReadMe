@@ -1,66 +1,120 @@
-@Endpoint
-public class NameAgeServiceEndpoint {
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.1</version>
+        <relativePath/>
+    </parent>
+    
+    <groupId>com.example</groupId>
+    <artifactId>soap-ws-security-service</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>SOAP WS-Security Service</name>
+    
+    <properties>
+        <java.version>17</java.version>
+        <spring-ws.version>4.0.4</spring-ws.version>
+    </properties>
+    
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web-services</artifactId>
+        </dependency>
+        
+        <dependency>
+            <groupId>wsdl4j</groupId>
+            <artifactId>wsdl4j</artifactId>
+        </dependency>
+        
+        <dependency>
+            <groupId>org.springframework.ws</groupId>
+            <artifactId>spring-ws-security</artifactId>
+            <version>${spring-ws.version}</version>
+        </dependency>
+        
+        <dependency>
+            <groupId>org.apache.ws.security</groupId>
+            <artifactId>wss4j</artifactId>
+            <version>1.6.19</version>
+        </dependency>
+        
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+    
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>jaxb2-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>xjc</id>
+                        <goals>
+                            <goal>xjc</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <sources>
+                        <source>src/main/resources/xsd/service.xsd</source>
+                    </sources>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
 
-    private static final String NAMESPACE_URI = "http://example.com/soapservice";
 
-    private static final Logger logger = LoggerFactory.getLogger(NameAgeServiceEndpoint.class);
 
-    @PayloadRoot(namespace = NAMESPACE_URI, localPart = "NameAgeRequest")
-    @ResponsePayload
-    public JAXBElement<NameAgeResponse> handleRequest(
-            @RequestPayload Element soapBodyElement, 
-            @SoapHeader(value = "{http://schemas.xmlsoap.org/ws/2003/06/secext}Security") Element soapHeader) {
-        try {
-            // Extract username from SOAP header
-            String username = extractUsername(soapHeader);
-            logger.info("Processing request for user: {}", username);
 
-            // Extract and validate XML payload
-            String payloadXml = extractPayloadXml(soapBodyElement);
-            validateAgainstXsd(payloadXml);
-            logger.info("Payload validation successful.");
 
-            // Create response object
-            NameAgeResponse response = new NameAgeResponse();
-            response.setStatus("Success");
-            return new JAXBElement<>(new QName(NAMESPACE_URI, "NameAgeResponse"), NameAgeResponse.class, response);
-        } catch (Exception e) {
-            logger.error("Error processing SOAP request", e);
-            throw new RuntimeException("Failed to process SOAP request");
-        }
+
+
+package com.example.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.ws.config.annotation.EnableWs;
+import org.springframework.ws.config.annotation.WsConfigurerAdapter;
+import org.springframework.ws.wsdl.wsdl11.DefaultWsdl11Definition;
+import org.springframework.ws.wsdl.wsdl11.Wsdl11Definition;
+import org.springframework.xml.xsd.SimpleXsdSchema;
+import org.springframework.xml.xsd.XsdSchema;
+
+@EnableWs
+@Configuration
+public class WebServiceConfig extends WsConfigurerAdapter {
+
+    @Bean(name = "securityService")
+    public Wsdl11Definition defaultWsdl11Definition(XsdSchema securityServiceSchema) {
+        DefaultWsdl11Definition wsdl11Definition = new DefaultWsdl11Definition();
+        wsdl11Definition.setPortTypeName("SecurityServicePort");
+        wsdl11Definition.setLocationUri("/ws");
+        wsdl11Definition.setTargetNamespace("http://example.com/security-service");
+        wsdl11Definition.setSchema(securityServiceSchema);
+        return wsdl11Definition;
     }
 
-    private String extractUsername(Element soapHeader) throws Exception {
-        // Extract username from WS-Security header
-        NodeList usernameNodes = soapHeader.getElementsByTagNameNS(
-                "http://schemas.xmlsoap.org/ws/2003/06/secext", "Username");
-        if (usernameNodes.getLength() > 0) {
-            return usernameNodes.item(0).getTextContent();
-        } else {
-            throw new IllegalArgumentException("Username not found in header");
-        }
-    }
-
-    private String extractPayloadXml(Element soapBodyElement) throws Exception {
-        // Extract and convert SOAP body payload to XML string
-        Transformer transformer = TransformerFactory.newInstance().newTransformer();
-        StringWriter writer = new StringWriter();
-        transformer.transform(new DOMSource(soapBodyElement), new StreamResult(writer));
-        return writer.toString();
-    }
-
-    private void validateAgainstXsd(String payloadXml) {
-        try {
-            SchemaFactory factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
-            Schema schema = factory.newSchema(new ClassPathResource("xsd/name-age.xsd").getFile());
-
-            Validator validator = schema.newValidator();
-            validator.validate(new StreamSource(new StringReader(payloadXml)));
-
-            logger.info("XML is valid against the XSD.");
-        } catch (IOException | SAXException e) {
-            throw new IllegalArgumentException("Invalid XML: " + e.getMessage(), e);
-        }
+    @Bean
+    public XsdSchema securityServiceSchema() {
+        return new SimpleXsdSchema(new ClassPathResource("xsd/service.xsd"));
     }
 }
 
@@ -69,20 +123,72 @@ public class NameAgeServiceEndpoint {
 
 
 
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="http://example.com/soapservice" targetNamespace="http://example.com/soapservice" elementFormDefault="qualified">
-    <xs:element name="NameAgeRequest">
+package com.example.endpoint;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.ws.context.MessageContext;
+import org.springframework.ws.server.endpoint.annotation.Endpoint;
+import org.springframework.ws.server.endpoint.annotation.PayloadRoot;
+import org.springframework.ws.server.endpoint.annotation.RequestPayload;
+import org.springframework.ws.server.endpoint.annotation.ResponsePayload;
+import org.springframework.ws.soap.SoapMessage;
+import org.springframework.ws.soap.security.wss4j2.Wss4jSecurityInterceptor;
+
+import com.example.service.SecurityRequest;
+import com.example.service.SecurityResponse;
+
+@Endpoint
+public class SecurityServiceEndpoint {
+    private static final Logger logger = LoggerFactory.getLogger(SecurityServiceEndpoint.class);
+    private static final String NAMESPACE_URI = "http://example.com/security-service";
+
+    @PayloadRoot(namespace = NAMESPACE_URI, localPart = "SecurityRequest")
+    @ResponsePayload
+    public SecurityResponse processSecurityRequest(
+        @RequestPayload SecurityRequest request, 
+        MessageContext messageContext
+    ) {
+        // Extract username from WS-Security header
+        SoapMessage soapMessage = (SoapMessage) messageContext.getRequest();
+        
+        // Log username (in a real-world scenario, you'd use a more secure way to extract credentials)
+        logger.info("Processing security request for username: {}", 
+            soapMessage.getSoapHeader().getHeaderElements()[0].getText());
+
+        // Create response
+        SecurityResponse response = new SecurityResponse();
+        response.setResult("success");
+        return response;
+    }
+}
+
+
+
+
+
+
+
+
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:tns="http://example.com/security-service"
+           targetNamespace="http://example.com/security-service"
+           elementFormDefault="qualified">
+
+    <xs:element name="SecurityRequest">
         <xs:complexType>
             <xs:sequence>
-                <xs:element name="Name" type="xs:string" minOccurs="1" maxOccurs="1"/>
-                <xs:element name="Age" type="xs:int" minOccurs="1" maxOccurs="1"/>
+                <xs:element name="requestId" type="xs:string"/>
+                <xs:element name="requestData" type="xs:string"/>
             </xs:sequence>
         </xs:complexType>
     </xs:element>
 
-    <xs:element name="NameAgeResponse">
+    <xs:element name="SecurityResponse">
         <xs:complexType>
             <xs:sequence>
-                <xs:element name="Status" type="xs:string" minOccurs="1" maxOccurs="1"/>
+                <xs:element name="result" type="xs:string"/>
             </xs:sequence>
         </xs:complexType>
     </xs:element>
@@ -92,257 +198,100 @@ public class NameAgeServiceEndpoint {
 
 
 
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-web-services</artifactId>
-</dependency>
-<dependency>
-    <groupId>javax.xml.bind</groupId>
-    <artifactId>jaxb-api</artifactId>
-</dependency>
-<dependency>
-    <groupId>org.glassfish.jaxb</groupId>
-    <artifactId>jaxb-runtime</artifactId>
-</dependency>
-<dependency>
-    <groupId>xerces</groupId>
-    <artifactId>xercesImpl</artifactId>
-</dependency>
-<dependency>
-    <groupId>org.springframework</groupId>
-    <artifactId>spring-context</artifactId>
-</dependency>
 
 
 
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://example.com/soapservice">
-   <soapenv:Header>
-      <wsse:Security xmlns:wsse="http://schemas.xmlsoap.org/ws/2003/06/secext">
-         <wsse:Username>testuser</wsse:Username>
-      </wsse:Security>
-   </soapenv:Header>
-   <soapenv:Body>
-      <ns:NameAgeRequest>
-         <ns:Name>John Doe</ns:Name>
-         <ns:Age>30</ns:Age>
-      </ns:NameAgeRequest>
-   </soapenv:Body>
+
+<?xml version="1.0" encoding="UTF-8"?>
+<wsdl:definitions 
+    xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+    xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+    xmlns:tns="http://example.com/security-service"
+    xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+    targetNamespace="http://example.com/security-service">
+
+    <wsdl:types>
+        <xsd:schema targetNamespace="http://example.com/security-service">
+            <xsd:element name="SecurityRequest">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="requestId" type="xsd:string"/>
+                        <xsd:element name="requestData" type="xsd:string"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+            
+            <xsd:element name="SecurityResponse">
+                <xsd:complexType>
+                    <xsd:sequence>
+                        <xsd:element name="result" type="xsd:string"/>
+                    </xsd:sequence>
+                </xsd:complexType>
+            </xsd:element>
+        </xsd:schema>
+    </wsdl:types>
+
+    <wsdl:message name="SecurityServiceRequest">
+        <wsdl:part name="parameters" element="tns:SecurityRequest"/>
+    </wsdl:message>
+
+    <wsdl:message name="SecurityServiceResponse">
+        <wsdl:part name="parameters" element="tns:SecurityResponse"/>
+    </wsdl:message>
+
+    <wsdl:portType name="SecurityServicePort">
+        <wsdl:operation name="ProcessSecurityRequest">
+            <wsdl:input message="tns:SecurityServiceRequest"/>
+            <wsdl:output message="tns:SecurityServiceResponse"/>
+        </wsdl:operation>
+    </wsdl:portType>
+
+    <wsdl:binding name="SecurityServiceBinding" type="tns:SecurityServicePort">
+        <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+        <wsdl:operation name="ProcessSecurityRequest">
+            <soap:operation soapAction=""/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+    </wsdl:binding>
+
+    <wsdl:service name="SecurityService">
+        <wsdl:port name="SecurityServicePort" binding="tns:SecurityServiceBinding">
+            <soap:address location="http://localhost:8080/ws"/>
+        </wsdl:port>
+    </wsdl:service>
+</wsdl:definitions>
+
+
+
+
+
+<soapenv:Envelope 
+    xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+    xmlns:sec="http://example.com/security-service">
+    <soapenv:Header>
+        <wsse:Security 
+            xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
+            <wsse:UsernameToken>
+                <wsse:Username>testuser</wsse:Username>
+                <wsse:Password>testpassword</wsse:Password>
+            </wsse:UsernameToken>
+        </wsse:Security>
+    </soapenv:Header>
+    <soapenv:Body>
+        <sec:SecurityRequest>
+            <requestId>REQ-001</requestId>
+            <requestData>Sample Security Request Data</requestData>
+        </sec:SecurityRequest>
+    </soapenv:Body>
 </soapenv:Envelope>
 
 
 
-@Bean
-public ServletRegistrationBean<MessageDispatcherServlet> messageDispatcherServlet(ApplicationContext applicationContext) {
-    MessageDispatcherServlet servlet = new MessageDispatcherServlet();
-    servlet.setApplicationContext(applicationContext);
-    servlet.setTransformWsdlLocations(true);
-    return new ServletRegistrationBean<>(servlet, "/soapservice/*");
-}
 
-@Bean(name = "nameAge")
-public DefaultWsdl11Definition defaultWsdl11Definition(XsdSchema nameAgeSchema) {
-    DefaultWsdl11Definition definition = new DefaultWsdl11Definition();
-    definition.setPortTypeName("NameAgePort");
-    definition.setLocationUri("/soapservice");
-    definition.setTargetNamespace("http://example.com/soapservice");
-    definition.setSchema(nameAgeSchema);
-    return definition;
-}
-
-@Bean
-public XsdSchema nameAgeSchema() {
-    return new SimpleXsdSchema(new ClassPathResource("xsd/name-age.xsd"));
-}
-
-
-
-
-
-
-
-
-package com.example.soapservice.endpoint;
-
-import com.example.soapservice.schema.NameAgeResponse;
-import jakarta.xml.bind.JAXBElement;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
-import org.springframework.ws.server.endpoint.annotation.Endpoint;
-import org.springframework.ws.server.endpoint.annotation.PayloadRoot;
-import org.springframework.ws.server.endpoint.annotation.RequestPayload;
-import org.springframework.ws.server.endpoint.annotation.ResponsePayload;
-import org.springframework.ws.soap.server.endpoint.annotation.SoapHeader;
-import org.w3c.dom.Element;
-import org.w3c.dom.NodeList;
-
-import javax.xml.XMLConstants;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
-import javax.xml.validation.Schema;
-import javax.xml.validation.SchemaFactory;
-import javax.xml.validation.Validator;
-import java.io.StringReader;
-import java.io.StringWriter;
-
-import org.xml.sax.SAXException;
-import java.io.File;
-import java.io.IOException;
-
-import javax.xml.transform.stream.StreamSource;
-
-@Component
-@Endpoint
-public class NameAgeServiceEndpoint {
-
-    private static final String NAMESPACE_URI = "http://example.com/soapservice";
-    private static final Logger logger = LoggerFactory.getLogger(NameAgeServiceEndpoint.class);
-
-    @PayloadRoot(namespace = NAMESPACE_URI, localPart = "NameAgeRequest")
-    @ResponsePayload
-    public JAXBElement<NameAgeResponse> handleRequest(
-            @RequestPayload Element soapBodyElement,
-            @SoapHeader(value = "{http://schemas.xmlsoap.org/ws/2003/06/secext}Security") Element soapHeader) {
-        try {
-            // Extract username from SOAP header
-            String username = extractUsername(soapHeader);
-            logger.info("Processing request for user: {}", username);
-
-            // Extract and validate XML payload
-            String payloadXml = extractPayloadXml(soapBodyElement);
-            validateAgainstXsd(payloadXml);
-            logger.info("Payload validation successful.");
-
-            // Create response object
-            NameAgeResponse response = new NameAgeResponse();
-            response.setStatus("Success");
-            return new JAXBElement<>(new javax.xml.namespace.QName(NAMESPACE_URI, "NameAgeResponse"), NameAgeResponse.class, response);
-        } catch (Exception e) {
-            logger.error("Error processing SOAP request", e);
-            throw new RuntimeException("Failed to process SOAP request", e);
-        }
-    }
-
-    private String extractUsername(Element soapHeader) throws Exception {
-        NodeList usernameNodes = soapHeader.getElementsByTagNameNS(
-                "http://schemas.xmlsoap.org/ws/2003/06/secext", "Username");
-        if (usernameNodes.getLength() > 0) {
-            return usernameNodes.item(0).getTextContent();
-        } else {
-            throw new IllegalArgumentException("Username not found in header");
-        }
-    }
-
-    private String extractPayloadXml(Element soapBodyElement) throws Exception {
-        Transformer transformer = TransformerFactory.newInstance().newTransformer();
-        StringWriter writer = new StringWriter();
-        transformer.transform(new DOMSource(soapBodyElement), new StreamResult(writer));
-        return writer.toString();
-    }
-
-    private void validateAgainstXsd(String payloadXml) {
-        try {
-            SchemaFactory factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
-            Schema schema = factory.newSchema(new File("src/main/resources/xsd/name-age.xsd"));
-
-            Validator validator = schema.newValidator();
-            validator.validate(new StreamSource(new StringReader(payloadXml)));
-
-            logger.info("XML is valid against the XSD.");
-        } catch (IOException | SAXException e) {
-            throw new IllegalArgumentException("Invalid XML: " + e.getMessage(), e);
-        }
-    }
-}
-
-
-
-
-package com.example.soapservice.config;
-
-import org.springframework.boot.web.servlet.ServletRegistrationBean;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.ws.transport.http.MessageDispatcherServlet;
-import org.springframework.ws.wsdl.wsdl11.DefaultWsdl11Definition;
-import org.springframework.xml.xsd.SimpleXsdSchema;
-import org.springframework.xml.xsd.XsdSchema;
-
-@Configuration
-public class WebServiceConfig {
-
-    @Bean
-    public ServletRegistrationBean<MessageDispatcherServlet> messageDispatcherServlet(org.springframework.context.ApplicationContext applicationContext) {
-        MessageDispatcherServlet servlet = new MessageDispatcherServlet();
-        servlet.setApplicationContext(applicationContext);
-        servlet.setTransformWsdlLocations(true);
-        return new ServletRegistrationBean<>(servlet, "/ws/*");
-    }
-
-    @Bean(name = "nameAge")
-    public DefaultWsdl11Definition defaultWsdl11Definition(XsdSchema nameAgeSchema) {
-        DefaultWsdl11Definition wsdl11Definition = new DefaultWsdl11Definition();
-        wsdl11Definition.setPortTypeName("NameAgePort");
-        wsdl11Definition.setLocationUri("/ws");
-        wsdl11Definition.setTargetNamespace("http://example.com/soapservice");
-        wsdl11Definition.setSchema(nameAgeSchema);
-        return wsdl11Definition;
-    }
-
-    @Bean
-    public XsdSchema nameAgeSchema() {
-        return new SimpleXsdSchema(new org.springframework.core.io.ClassPathResource("xsd/name-age.xsd"));
-    }
-}
-
-
-
-
-
-<build>
-    <plugins>
-        <plugin>
-            <groupId>org.codehaus.mojo</groupId>
-            <artifactId>jaxb2-maven-plugin</artifactId>
-            <version>2.5.0</version>
-            <executions>
-                <execution>
-                    <goals>
-                        <goal>xjc</goal>
-                    </goals>
-                </execution>
-            </executions>
-            <configuration>
-                <schemaDirectory>src/main/resources/xsd</schemaDirectory>
-                <outputDirectory>src/main/java</outputDirectory>
-                <packageName>com.example.soapservice.schema</packageName>
-            </configuration>
-        </plugin>
-    </plugins>
-</build>
-
-
-
-package com.example.soapservice.schema;
-
-public class NameAgeResponse {
-    private String status;
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-}
-
-
-
-
-
-
-
-
+server.port=8080
+logging.level.org.springframework.ws=DEBUG
