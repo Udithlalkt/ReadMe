@@ -295,3 +295,117 @@ public class SecurityServiceEndpoint {
 
 server.port=8080
 logging.level.org.springframework.ws=DEBUG
+
+
+
+
+package com.example.config;
+
+import org.apache.wss4j.common.ext.WSPasswordCallback;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.ws.context.MessageContext;
+import org.springframework.ws.server.endpoint.annotation.Endpoint;
+import org.springframework.ws.server.endpoint.annotation.PayloadRoot;
+import org.springframework.ws.server.endpoint.annotation.RequestPayload;
+import org.springframework.ws.server.endpoint.annotation.ResponsePayload;
+import org.springframework.ws.soap.SoapMessage;
+import org.springframework.ws.soap.saaj.SaajSoapMessage;
+
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.CallbackHandler;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import java.io.IOException;
+
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+
+@Endpoint
+public class WssSecurityInterceptor implements CallbackHandler {
+    private static final Logger logger = LoggerFactory.getLogger(WssSecurityInterceptor.class);
+    private static final String NAMESPACE_URI = "http://example.com/security-service";
+
+    @Override
+    public void handle(Callback[] callbacks) throws IOException, UnsupportedCallbackException {
+        for (Callback callback : callbacks) {
+            if (callback instanceof WSPasswordCallback) {
+                WSPasswordCallback passwordCallback = (WSPasswordCallback) callback;
+                
+                // Simple logging of username and password
+                logger.info("Extracted Username: {}", passwordCallback.getIdentifier());
+                logger.info("Extracted Password: {}", passwordCallback.getPassword());
+            }
+        }
+    }
+
+    @PayloadRoot(namespace = NAMESPACE_URI, localPart = "SecurityRequest")
+    @ResponsePayload
+    public SecurityResponse processSecurityRequest(
+        @RequestPayload SecurityRequest request,
+        MessageContext messageContext
+    ) {
+        try {
+            // Get the SOAP message
+            SoapMessage soapMessage = (SoapMessage) messageContext.getRequest();
+            
+            // Extract WS-Security header
+            org.w3c.dom.Element securityHeader = extractSecurityHeader(soapMessage);
+            
+            if (securityHeader != null) {
+                // Extract username
+                Node usernameNode = findChildNode(securityHeader, "Username");
+                Node passwordNode = findChildNode(securityHeader, "Password");
+                
+                if (usernameNode != null && passwordNode != null) {
+                    String username = usernameNode.getTextContent();
+                    String password = passwordNode.getTextContent();
+                    
+                    // Log extracted credentials
+                    logger.info("Username from SOAP Header: {}", username);
+                    logger.info("Password from SOAP Header: {}", password);
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error extracting WS-Security header", e);
+        }
+
+        // Create and return response
+        SecurityResponse response = new SecurityResponse();
+        response.setResult("success");
+        return response;
+    }
+
+    private org.w3c.dom.Element extractSecurityHeader(SoapMessage soapMessage) {
+        try {
+            // Get SOAP envelope
+            javax.xml.soap.SOAPMessage saajMessage = ((SaajSoapMessage) soapMessage).getSaajMessage();
+            javax.xml.soap.SOAPHeader header = saajMessage.getSOAPHeader();
+            
+            // Find Security header element
+            NodeList securityElements = header.getElementsByTagNameNS(
+                "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd", 
+                "Security"
+            );
+            
+            if (securityElements.getLength() > 0) {
+                return (org.w3c.dom.Element) securityElements.item(0);
+            }
+        } catch (Exception e) {
+            logger.error("Error extracting security header", e);
+        }
+        return null;
+    }
+
+    private Node findChildNode(org.w3c.dom.Element parent, String nodeName) {
+        if (parent == null) return null;
+        
+        NodeList children = parent.getChildNodes();
+        for (int i = 0; i < children.getLength(); i++) {
+            Node child = children.item(i);
+            if (child.getNodeName().contains(nodeName)) {
+                return child;
+            }
+        }
+        return null;
+    }
+}
