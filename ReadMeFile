@@ -130,3 +130,198 @@ public class NameAgeServiceEndpoint {
 </soapenv:Envelope>
 
 
+
+@Bean
+public ServletRegistrationBean<MessageDispatcherServlet> messageDispatcherServlet(ApplicationContext applicationContext) {
+    MessageDispatcherServlet servlet = new MessageDispatcherServlet();
+    servlet.setApplicationContext(applicationContext);
+    servlet.setTransformWsdlLocations(true);
+    return new ServletRegistrationBean<>(servlet, "/soapservice/*");
+}
+
+@Bean(name = "nameAge")
+public DefaultWsdl11Definition defaultWsdl11Definition(XsdSchema nameAgeSchema) {
+    DefaultWsdl11Definition definition = new DefaultWsdl11Definition();
+    definition.setPortTypeName("NameAgePort");
+    definition.setLocationUri("/soapservice");
+    definition.setTargetNamespace("http://example.com/soapservice");
+    definition.setSchema(nameAgeSchema);
+    return definition;
+}
+
+@Bean
+public XsdSchema nameAgeSchema() {
+    return new SimpleXsdSchema(new ClassPathResource("xsd/name-age.xsd"));
+}
+
+
+
+
+
+
+
+
+package com.example.soapservice.endpoint;
+
+import com.example.soapservice.schema.NameAgeResponse;
+import jakarta.xml.bind.JAXBElement;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+import org.springframework.ws.server.endpoint.annotation.Endpoint;
+import org.springframework.ws.server.endpoint.annotation.PayloadRoot;
+import org.springframework.ws.server.endpoint.annotation.RequestPayload;
+import org.springframework.ws.server.endpoint.annotation.ResponsePayload;
+import org.springframework.ws.soap.server.endpoint.annotation.SoapHeader;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
+
+import javax.xml.XMLConstants;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+import javax.xml.validation.Schema;
+import javax.xml.validation.SchemaFactory;
+import javax.xml.validation.Validator;
+import java.io.StringReader;
+import java.io.StringWriter;
+
+import org.xml.sax.SAXException;
+import java.io.File;
+import java.io.IOException;
+
+import javax.xml.transform.stream.StreamSource;
+
+@Component
+@Endpoint
+public class NameAgeServiceEndpoint {
+
+    private static final String NAMESPACE_URI = "http://example.com/soapservice";
+    private static final Logger logger = LoggerFactory.getLogger(NameAgeServiceEndpoint.class);
+
+    @PayloadRoot(namespace = NAMESPACE_URI, localPart = "NameAgeRequest")
+    @ResponsePayload
+    public JAXBElement<NameAgeResponse> handleRequest(
+            @RequestPayload Element soapBodyElement,
+            @SoapHeader(value = "{http://schemas.xmlsoap.org/ws/2003/06/secext}Security") Element soapHeader) {
+        try {
+            // Extract username from SOAP header
+            String username = extractUsername(soapHeader);
+            logger.info("Processing request for user: {}", username);
+
+            // Extract and validate XML payload
+            String payloadXml = extractPayloadXml(soapBodyElement);
+            validateAgainstXsd(payloadXml);
+            logger.info("Payload validation successful.");
+
+            // Create response object
+            NameAgeResponse response = new NameAgeResponse();
+            response.setStatus("Success");
+            return new JAXBElement<>(new javax.xml.namespace.QName(NAMESPACE_URI, "NameAgeResponse"), NameAgeResponse.class, response);
+        } catch (Exception e) {
+            logger.error("Error processing SOAP request", e);
+            throw new RuntimeException("Failed to process SOAP request", e);
+        }
+    }
+
+    private String extractUsername(Element soapHeader) throws Exception {
+        NodeList usernameNodes = soapHeader.getElementsByTagNameNS(
+                "http://schemas.xmlsoap.org/ws/2003/06/secext", "Username");
+        if (usernameNodes.getLength() > 0) {
+            return usernameNodes.item(0).getTextContent();
+        } else {
+            throw new IllegalArgumentException("Username not found in header");
+        }
+    }
+
+    private String extractPayloadXml(Element soapBodyElement) throws Exception {
+        Transformer transformer = TransformerFactory.newInstance().newTransformer();
+        StringWriter writer = new StringWriter();
+        transformer.transform(new DOMSource(soapBodyElement), new StreamResult(writer));
+        return writer.toString();
+    }
+
+    private void validateAgainstXsd(String payloadXml) {
+        try {
+            SchemaFactory factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
+            Schema schema = factory.newSchema(new File("src/main/resources/xsd/name-age.xsd"));
+
+            Validator validator = schema.newValidator();
+            validator.validate(new StreamSource(new StringReader(payloadXml)));
+
+            logger.info("XML is valid against the XSD.");
+        } catch (IOException | SAXException e) {
+            throw new IllegalArgumentException("Invalid XML: " + e.getMessage(), e);
+        }
+    }
+}
+
+
+
+
+package com.example.soapservice.config;
+
+import org.springframework.boot.web.servlet.ServletRegistrationBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.ws.transport.http.MessageDispatcherServlet;
+import org.springframework.ws.wsdl.wsdl11.DefaultWsdl11Definition;
+import org.springframework.xml.xsd.SimpleXsdSchema;
+import org.springframework.xml.xsd.XsdSchema;
+
+@Configuration
+public class WebServiceConfig {
+
+    @Bean
+    public ServletRegistrationBean<MessageDispatcherServlet> messageDispatcherServlet(org.springframework.context.ApplicationContext applicationContext) {
+        MessageDispatcherServlet servlet = new MessageDispatcherServlet();
+        servlet.setApplicationContext(applicationContext);
+        servlet.setTransformWsdlLocations(true);
+        return new ServletRegistrationBean<>(servlet, "/ws/*");
+    }
+
+    @Bean(name = "nameAge")
+    public DefaultWsdl11Definition defaultWsdl11Definition(XsdSchema nameAgeSchema) {
+        DefaultWsdl11Definition wsdl11Definition = new DefaultWsdl11Definition();
+        wsdl11Definition.setPortTypeName("NameAgePort");
+        wsdl11Definition.setLocationUri("/ws");
+        wsdl11Definition.setTargetNamespace("http://example.com/soapservice");
+        wsdl11Definition.setSchema(nameAgeSchema);
+        return wsdl11Definition;
+    }
+
+    @Bean
+    public XsdSchema nameAgeSchema() {
+        return new SimpleXsdSchema(new org.springframework.core.io.ClassPathResource("xsd/name-age.xsd"));
+    }
+}
+
+
+
+
+
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>jaxb2-maven-plugin</artifactId>
+            <version>2.5.0</version>
+            <executions>
+                <execution>
+                    <goals>
+                        <goal>xjc</goal>
+                    </goals>
+                </execution>
+            </executions>
+            <configuration>
+                <schemaDirectory>src/main/resources/xsd</schemaDirectory>
+                <outputDirectory>src/main/java</outputDirectory>
+                <packageName>com.example.soapservice.schema</packageName>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
+
+
+
