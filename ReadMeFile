@@ -325,3 +325,24 @@ public class WebServiceConfig {
 
 
 
+package com.example.soapservice.schema;
+
+public class NameAgeResponse {
+    private String status;
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+}
+
+
+
+
+
+
+
+
