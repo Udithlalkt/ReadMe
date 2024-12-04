@@ -1,3 +1,37 @@
+package com.example.soapwebservice.endpoint;
+
+import org.springframework.ws.server.endpoint.annotation.Endpoint;
+import org.springframework.ws.server.endpoint.annotation.PayloadRoot;
+import org.springframework.ws.server.endpoint.annotation.RequestPayload;
+import org.springframework.ws.server.endpoint.annotation.ResponsePayload;
+
+import com.example.soapwebservice.model.UserRequest;
+import com.example.soapwebservice.model.UserResponse;
+
+@Endpoint
+public class UserEndpoint {
+
+    private static final String NAMESPACE_URI = "http://example.com/soap-webservice";
+
+    @PayloadRoot(namespace = NAMESPACE_URI, localPart = "UserRequest")
+    @ResponsePayload
+    public UserResponse processUserRequest(@RequestPayload UserRequest request) {
+        UserResponse response = new UserResponse();
+        
+        // Extract body from request
+        String requestBody = request.getRequestBody();
+        
+        // Set the same body in response (as per requirement)
+        response.setResponseBody(requestBody);
+        
+        return response;
+    }
+}
+
+
+
+
+
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -8,47 +42,18 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
         <version>3.2.1</version>
-        <relativePath/>
     </parent>
     
     <groupId>com.example</groupId>
-    <artifactId>soap-ws-security-service</artifactId>
+    <artifactId>soap-webservice</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>SOAP WS-Security Service</name>
     
     <properties>
         <java.version>17</java.version>
-        <spring-ws.version>4.0.4</spring-ws.version>
     </properties>
     
     <dependencies>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web-services</artifactId>
-        </dependency>
-        
-        <dependency>
-            <groupId>wsdl4j</groupId>
-            <artifactId>wsdl4j</artifactId>
-        </dependency>
-        
-        <dependency>
-            <groupId>org.springframework.ws</groupId>
-            <artifactId>spring-ws-security</artifactId>
-            <version>${spring-ws.version}</version>
-        </dependency>
-        
-        <dependency>
-            <groupId>org.apache.ws.security</groupId>
-            <artifactId>wss4j</artifactId>
-            <version>1.6.19</version>
-        </dependency>
-        
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
+        <!-- Previous dependencies remain the same -->
     </dependencies>
     
     <build>
@@ -57,7 +62,6 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
-            
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>jaxb2-maven-plugin</artifactId>
@@ -72,8 +76,9 @@
                 </executions>
                 <configuration>
                     <sources>
-                        <source>src/main/resources/xsd/service.xsd</source>
+                        <source>src/main/resources/xsd/user.xsd</source>
                     </sources>
+                    <packageName>com.example.soapwebservice.model</packageName>
                 </configuration>
             </plugin>
         </plugins>
@@ -84,111 +89,24 @@
 
 
 
-
-
-package com.example.config;
-
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.ws.config.annotation.EnableWs;
-import org.springframework.ws.config.annotation.WsConfigurerAdapter;
-import org.springframework.ws.wsdl.wsdl11.DefaultWsdl11Definition;
-import org.springframework.ws.wsdl.wsdl11.Wsdl11Definition;
-import org.springframework.xml.xsd.SimpleXsdSchema;
-import org.springframework.xml.xsd.XsdSchema;
-
-@EnableWs
-@Configuration
-public class WebServiceConfig extends WsConfigurerAdapter {
-
-    @Bean(name = "securityService")
-    public Wsdl11Definition defaultWsdl11Definition(XsdSchema securityServiceSchema) {
-        DefaultWsdl11Definition wsdl11Definition = new DefaultWsdl11Definition();
-        wsdl11Definition.setPortTypeName("SecurityServicePort");
-        wsdl11Definition.setLocationUri("/ws");
-        wsdl11Definition.setTargetNamespace("http://example.com/security-service");
-        wsdl11Definition.setSchema(securityServiceSchema);
-        return wsdl11Definition;
-    }
-
-    @Bean
-    public XsdSchema securityServiceSchema() {
-        return new SimpleXsdSchema(new ClassPathResource("xsd/service.xsd"));
-    }
-}
-
-
-
-
-
-
-package com.example.endpoint;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.ws.context.MessageContext;
-import org.springframework.ws.server.endpoint.annotation.Endpoint;
-import org.springframework.ws.server.endpoint.annotation.PayloadRoot;
-import org.springframework.ws.server.endpoint.annotation.RequestPayload;
-import org.springframework.ws.server.endpoint.annotation.ResponsePayload;
-import org.springframework.ws.soap.SoapMessage;
-import org.springframework.ws.soap.security.wss4j2.Wss4jSecurityInterceptor;
-
-import com.example.service.SecurityRequest;
-import com.example.service.SecurityResponse;
-
-@Endpoint
-public class SecurityServiceEndpoint {
-    private static final Logger logger = LoggerFactory.getLogger(SecurityServiceEndpoint.class);
-    private static final String NAMESPACE_URI = "http://example.com/security-service";
-
-    @PayloadRoot(namespace = NAMESPACE_URI, localPart = "SecurityRequest")
-    @ResponsePayload
-    public SecurityResponse processSecurityRequest(
-        @RequestPayload SecurityRequest request, 
-        MessageContext messageContext
-    ) {
-        // Extract username from WS-Security header
-        SoapMessage soapMessage = (SoapMessage) messageContext.getRequest();
-        
-        // Log username (in a real-world scenario, you'd use a more secure way to extract credentials)
-        logger.info("Processing security request for username: {}", 
-            soapMessage.getSoapHeader().getHeaderElements()[0].getText());
-
-        // Create response
-        SecurityResponse response = new SecurityResponse();
-        response.setResult("success");
-        return response;
-    }
-}
-
-
-
-
-
-
-
-
 <?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
-           xmlns:tns="http://example.com/security-service"
-           targetNamespace="http://example.com/security-service"
+           xmlns:tns="http://example.com/soap-webservice"
+           targetNamespace="http://example.com/soap-webservice"
            elementFormDefault="qualified">
 
-    <xs:element name="SecurityRequest">
+    <xs:element name="UserRequest">
         <xs:complexType>
             <xs:sequence>
-                <xs:element name="requestId" type="xs:string"/>
-                <xs:element name="requestData" type="xs:string"/>
+                <xs:element name="requestBody" type="xs:string"/>
             </xs:sequence>
         </xs:complexType>
     </xs:element>
 
-    <xs:element name="SecurityResponse">
+    <xs:element name="UserResponse">
         <xs:complexType>
             <xs:sequence>
-                <xs:element name="result" type="xs:string"/>
+                <xs:element name="responseBody" type="xs:string"/>
             </xs:sequence>
         </xs:complexType>
     </xs:element>
@@ -197,215 +115,141 @@ public class SecurityServiceEndpoint {
 
 
 
-
-
-
-
-
 <?xml version="1.0" encoding="UTF-8"?>
-<wsdl:definitions 
-    xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+<definitions 
+    name="UserService"
+    targetNamespace="http://example.com/soap-webservice"
+    xmlns="http://schemas.xmlsoap.org/wsdl/"
     xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
-    xmlns:tns="http://example.com/security-service"
-    xmlns:xsd="http://www.w3.org/2001/XMLSchema"
-    targetNamespace="http://example.com/security-service">
+    xmlns:tns="http://example.com/soap-webservice"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema">
 
-    <wsdl:types>
-        <xsd:schema targetNamespace="http://example.com/security-service">
-            <xsd:element name="SecurityRequest">
-                <xsd:complexType>
-                    <xsd:sequence>
-                        <xsd:element name="requestId" type="xsd:string"/>
-                        <xsd:element name="requestData" type="xsd:string"/>
-                    </xsd:sequence>
-                </xsd:complexType>
-            </xsd:element>
-            
-            <xsd:element name="SecurityResponse">
-                <xsd:complexType>
-                    <xsd:sequence>
-                        <xsd:element name="result" type="xsd:string"/>
-                    </xsd:sequence>
-                </xsd:complexType>
-            </xsd:element>
-        </xsd:schema>
-    </wsdl:types>
+    <types>
+        <xs:schema targetNamespace="http://example.com/soap-webservice">
+            <xs:element name="UserRequest">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="requestBody" type="xs:string"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="UserResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="responseBody" type="xs:string"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+        </xs:schema>
+    </types>
 
-    <wsdl:message name="SecurityServiceRequest">
-        <wsdl:part name="parameters" element="tns:SecurityRequest"/>
-    </wsdl:message>
+    <message name="UserRequestMessage">
+        <part name="parameters" element="tns:UserRequest"/>
+    </message>
+    <message name="UserResponseMessage">
+        <part name="parameters" element="tns:UserResponse"/>
+    </message>
 
-    <wsdl:message name="SecurityServiceResponse">
-        <wsdl:part name="parameters" element="tns:SecurityResponse"/>
-    </wsdl:message>
+    <portType name="UserServicePort">
+        <operation name="ProcessUserRequest">
+            <input message="tns:UserRequestMessage"/>
+            <output message="tns:UserResponseMessage"/>
+        </operation>
+    </portType>
 
-    <wsdl:portType name="SecurityServicePort">
-        <wsdl:operation name="ProcessSecurityRequest">
-            <wsdl:input message="tns:SecurityServiceRequest"/>
-            <wsdl:output message="tns:SecurityServiceResponse"/>
-        </wsdl:operation>
-    </wsdl:portType>
-
-    <wsdl:binding name="SecurityServiceBinding" type="tns:SecurityServicePort">
-        <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
-        <wsdl:operation name="ProcessSecurityRequest">
-            <soap:operation soapAction=""/>
-            <wsdl:input>
+    <binding name="UserServiceBinding" type="tns:UserServicePort">
+        <soap:binding transport="http://schemas.xmlsoap.org/soap/http"/>
+        <operation name="ProcessUserRequest">
+            <soap:operation soapAction="http://example.com/soap-webservice/ProcessUserRequest"/>
+            <input>
                 <soap:body use="literal"/>
-            </wsdl:input>
-            <wsdl:output>
+            </input>
+            <output>
                 <soap:body use="literal"/>
-            </wsdl:output>
-        </wsdl:operation>
-    </wsdl:binding>
+            </output>
+        </operation>
+    </binding>
 
-    <wsdl:service name="SecurityService">
-        <wsdl:port name="SecurityServicePort" binding="tns:SecurityServiceBinding">
+    <service name="UserService">
+        <port name="UserServicePort" binding="tns:UserServiceBinding">
             <soap:address location="http://localhost:8080/ws"/>
-        </wsdl:port>
-    </wsdl:service>
-</wsdl:definitions>
+        </port>
+    </service>
+</definitions>
 
 
 
 
 
-<soapenv:Envelope 
-    xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-    xmlns:sec="http://example.com/security-service">
-    <soapenv:Header>
-        <wsse:Security 
-            xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
-            <wsse:UsernameToken>
-                <wsse:Username>testuser</wsse:Username>
-                <wsse:Password>testpassword</wsse:Password>
-            </wsse:UsernameToken>
-        </wsse:Security>
-    </soapenv:Header>
-    <soapenv:Body>
-        <sec:SecurityRequest>
-            <requestId>REQ-001</requestId>
-            <requestData>Sample Security Request Data</requestData>
-        </sec:SecurityRequest>
-    </soapenv:Body>
-</soapenv:Envelope>
+package com.example.soapwebservice.config;
 
+import org.springframework.boot.web.servlet.ServletRegistrationBean;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.ws.config.annotation.EnableWs;
+import org.springframework.ws.config.annotation.WsConfigurerAdapter;
+import org.springframework.ws.transport.http.MessageDispatcherServlet;
+import org.springframework.ws.wsdl.wsdl11.DefaultWsdl11Definition;
+import org.springframework.xml.xsd.SimpleXsdSchema;
+import org.springframework.xml.xsd.XsdSchema;
 
+@EnableWs
+@Configuration
+public class WebServiceConfig extends WsConfigurerAdapter {
 
-
-server.port=8080
-logging.level.org.springframework.ws=DEBUG
-
-
-
-
-package com.example.config;
-
-import org.apache.wss4j.common.ext.WSPasswordCallback;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.ws.context.MessageContext;
-import org.springframework.ws.server.endpoint.annotation.Endpoint;
-import org.springframework.ws.server.endpoint.annotation.PayloadRoot;
-import org.springframework.ws.server.endpoint.annotation.RequestPayload;
-import org.springframework.ws.server.endpoint.annotation.ResponsePayload;
-import org.springframework.ws.soap.SoapMessage;
-import org.springframework.ws.soap.saaj.SaajSoapMessage;
-
-import javax.security.auth.callback.Callback;
-import javax.security.auth.callback.CallbackHandler;
-import javax.security.auth.callback.UnsupportedCallbackException;
-import java.io.IOException;
-
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-
-@Endpoint
-public class WssSecurityInterceptor implements CallbackHandler {
-    private static final Logger logger = LoggerFactory.getLogger(WssSecurityInterceptor.class);
-    private static final String NAMESPACE_URI = "http://example.com/security-service";
-
-    @Override
-    public void handle(Callback[] callbacks) throws IOException, UnsupportedCallbackException {
-        for (Callback callback : callbacks) {
-            if (callback instanceof WSPasswordCallback) {
-                WSPasswordCallback passwordCallback = (WSPasswordCallback) callback;
-                
-                // Simple logging of username and password
-                logger.info("Extracted Username: {}", passwordCallback.getIdentifier());
-                logger.info("Extracted Password: {}", passwordCallback.getPassword());
-            }
-        }
+    @Bean
+    public ServletRegistrationBean<MessageDispatcherServlet> messageDispatcherServlet(ApplicationContext context) {
+        MessageDispatcherServlet servlet = new MessageDispatcherServlet();
+        servlet.setApplicationContext(context);
+        servlet.setTransformWsdlLocations(true);
+        return new ServletRegistrationBean<>(servlet, "/ws/*");
     }
 
-    @PayloadRoot(namespace = NAMESPACE_URI, localPart = "SecurityRequest")
-    @ResponsePayload
-    public SecurityResponse processSecurityRequest(
-        @RequestPayload SecurityRequest request,
-        MessageContext messageContext
-    ) {
-        try {
-            // Get the SOAP message
-            SoapMessage soapMessage = (SoapMessage) messageContext.getRequest();
-            
-            // Extract WS-Security header
-            org.w3c.dom.Element securityHeader = extractSecurityHeader(soapMessage);
-            
-            if (securityHeader != null) {
-                // Extract username
-                Node usernameNode = findChildNode(securityHeader, "Username");
-                Node passwordNode = findChildNode(securityHeader, "Password");
-                
-                if (usernameNode != null && passwordNode != null) {
-                    String username = usernameNode.getTextContent();
-                    String password = passwordNode.getTextContent();
-                    
-                    // Log extracted credentials
-                    logger.info("Username from SOAP Header: {}", username);
-                    logger.info("Password from SOAP Header: {}", password);
-                }
-            }
-        } catch (Exception e) {
-            logger.error("Error extracting WS-Security header", e);
-        }
-
-        // Create and return response
-        SecurityResponse response = new SecurityResponse();
-        response.setResult("success");
-        return response;
+    @Bean(name = "userService")
+    public DefaultWsdl11Definition defaultWsdl11Definition(XsdSchema userSchema) {
+        DefaultWsdl11Definition wsdl11Definition = new DefaultWsdl11Definition();
+        wsdl11Definition.setPortTypeName("UserServicePort");
+        wsdl11Definition.setLocationUri("/ws");
+        wsdl11Definition.setTargetNamespace("http://example.com/soap-webservice");
+        wsdl11Definition.setSchema(userSchema);
+        return wsdl11Definition;
     }
 
-    private org.w3c.dom.Element extractSecurityHeader(SoapMessage soapMessage) {
-        try {
-            // Get SOAP envelope
-            javax.xml.soap.SOAPMessage saajMessage = ((SaajSoapMessage) soapMessage).getSaajMessage();
-            javax.xml.soap.SOAPHeader header = saajMessage.getSOAPHeader();
-            
-            // Find Security header element
-            NodeList securityElements = header.getElementsByTagNameNS(
-                "http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd", 
-                "Security"
-            );
-            
-            if (securityElements.getLength() > 0) {
-                return (org.w3c.dom.Element) securityElements.item(0);
-            }
-        } catch (Exception e) {
-            logger.error("Error extracting security header", e);
-        }
-        return null;
-    }
-
-    private Node findChildNode(org.w3c.dom.Element parent, String nodeName) {
-        if (parent == null) return null;
-        
-        NodeList children = parent.getChildNodes();
-        for (int i = 0; i < children.getLength(); i++) {
-            Node child = children.item(i);
-            if (child.getNodeName().contains(nodeName)) {
-                return child;
-            }
-        }
-        return null;
+    @Bean
+    public XsdSchema userSchema() {
+        return new SimpleXsdSchema(new ClassPathResource("xsd/user.xsd"));
     }
 }
+
+
+
+
+Sample SOAP Request:
+```xml
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                  xmlns:web="http://example.com/soap-webservice">
+   <soapenv:Header>
+      <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
+         <!-- WS-Security Header (placeholder) -->
+      </wsse:Security>
+   </soapenv:Header>
+   <soapenv:Body>
+      <web:UserRequest>
+         <web:requestBody>Hello, this is a test request</web:requestBody>
+      </web:UserRequest>
+   </soapenv:Body>
+</soapenv:Envelope>
+
+Sample SOAP Response:
+```xml
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                  xmlns:web="http://example.com/soap-webservice">
+   <soapenv:Body>
+      <web:UserResponse>
+         <web:responseBody>Hello, this is a test request</web:responseBody>
+      </web:UserResponse>
+   </soapenv:Body>
+</soapenv:Envelope>
+```
