@@ -1,255 +1,49 @@
-package com.example.soapwebservice.endpoint;
+package com.avivacanada.services.policyintegrationservice.policybatchrenewal.v1;
 
-import org.springframework.ws.server.endpoint.annotation.Endpoint;
-import org.springframework.ws.server.endpoint.annotation.PayloadRoot;
-import org.springframework.ws.server.endpoint.annotation.RequestPayload;
-import org.springframework.ws.server.endpoint.annotation.ResponsePayload;
+import jakarta.xml.bind.annotation.XmlAccessType;
+import jakarta.xml.bind.annotation.XmlAccessorType;
+import jakarta.xml.bind.annotation.XmlElement;
+import jakarta.xml.bind.annotation.XmlRootElement;
+import java.util.List;
 
-import com.example.soapwebservice.model.UserRequest;
-import com.example.soapwebservice.model.UserResponse;
+@XmlRootElement(name = "PolicyBatchRenewalRq")
+@XmlAccessorType(XmlAccessType.FIELD)
+public class PolicyBatchRenewalRq {
 
-@Endpoint
-public class UserEndpoint {
+    @XmlElement(name = "ClientInfo", namespace = "http://www.avivacanada.com/services/policyintegrationservice/policybatchrenewal/v1")
+    private ClientInfo clientInfo;
 
-    private static final String NAMESPACE_URI = "http://example.com/soap-webservice";
+    @XmlElement(name = "PrimaryPolicySystemId", namespace = "http://www.avivacanada.com/services/policyintegrationservice/policybatchrenewal/v1")
+    private String primaryPolicySystemId;
 
-    @PayloadRoot(namespace = NAMESPACE_URI, localPart = "UserRequest")
-    @ResponsePayload
-    public UserResponse processUserRequest(@RequestPayload UserRequest request) {
-        UserResponse response = new UserResponse();
-        
-        // Extract body from request
-        String requestBody = request.getRequestBody();
-        
-        // Set the same body in response (as per requirement)
-        response.setResponseBody(requestBody);
-        
-        return response;
-    }
+    @XmlElement(name = "RenewalDetail", namespace = "http://www.avivacanada.com/services/policyintegrationservice/policybatchrenewal/v1")
+    private List<RenewalDetail> renewalDetails;
+
+    // Getters and Setters
 }
 
 
 
+package com.avivacanada.services.policyintegrationservice.policybatchrenewal.v1;
 
+import jakarta.xml.bind.annotation.XmlAccessType;
+import jakarta.xml.bind.annotation.XmlAccessorType;
+import jakarta.xml.bind.annotation.XmlElement;
 
-<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
-    
-    <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.1</version>
-    </parent>
-    
-    <groupId>com.example</groupId>
-    <artifactId>soap-webservice</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
-    
-    <properties>
-        <java.version>17</java.version>
-    </properties>
-    
-    <dependencies>
-        <!-- Previous dependencies remain the same -->
-    </dependencies>
-    
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-            </plugin>
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>jaxb2-maven-plugin</artifactId>
-                <version>3.1.0</version>
-                <executions>
-                    <execution>
-                        <id>xjc</id>
-                        <goals>
-                            <goal>xjc</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <configuration>
-                    <sources>
-                        <source>src/main/resources/xsd/user.xsd</source>
-                    </sources>
-                    <packageName>com.example.soapwebservice.model</packageName>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
-</project>
+@XmlAccessorType(XmlAccessType.FIELD)
+public class ClientInfo {
 
+    @XmlElement(name = "ClientID", namespace = "http://www.avivacanada.com/services/policyintegrationservice/policybatchrenewal/v1")
+    private String clientId;
 
+    @XmlElement(name = "ClientName", namespace = "http://www.avivacanada.com/services/policyintegrationservice/policybatchrenewal/v1")
+    private String clientName;
 
+    @XmlElement(name = "ClientGUID", namespace = "http://www.avivacanada.com/services/policyintegrationservice/policybatchrenewal/v1")
+    private String clientGUID;
 
-
-<?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
-           xmlns:tns="http://example.com/soap-webservice"
-           targetNamespace="http://example.com/soap-webservice"
-           elementFormDefault="qualified">
-
-    <xs:element name="UserRequest">
-        <xs:complexType>
-            <xs:sequence>
-                <xs:element name="requestBody" type="xs:string"/>
-            </xs:sequence>
-        </xs:complexType>
-    </xs:element>
-
-    <xs:element name="UserResponse">
-        <xs:complexType>
-            <xs:sequence>
-                <xs:element name="responseBody" type="xs:string"/>
-            </xs:sequence>
-        </xs:complexType>
-    </xs:element>
-</xs:schema>
-
-
-
-
-<?xml version="1.0" encoding="UTF-8"?>
-<definitions 
-    name="UserService"
-    targetNamespace="http://example.com/soap-webservice"
-    xmlns="http://schemas.xmlsoap.org/wsdl/"
-    xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
-    xmlns:tns="http://example.com/soap-webservice"
-    xmlns:xs="http://www.w3.org/2001/XMLSchema">
-
-    <types>
-        <xs:schema targetNamespace="http://example.com/soap-webservice">
-            <xs:element name="UserRequest">
-                <xs:complexType>
-                    <xs:sequence>
-                        <xs:element name="requestBody" type="xs:string"/>
-                    </xs:sequence>
-                </xs:complexType>
-            </xs:element>
-            <xs:element name="UserResponse">
-                <xs:complexType>
-                    <xs:sequence>
-                        <xs:element name="responseBody" type="xs:string"/>
-                    </xs:sequence>
-                </xs:complexType>
-            </xs:element>
-        </xs:schema>
-    </types>
-
-    <message name="UserRequestMessage">
-        <part name="parameters" element="tns:UserRequest"/>
-    </message>
-    <message name="UserResponseMessage">
-        <part name="parameters" element="tns:UserResponse"/>
-    </message>
-
-    <portType name="UserServicePort">
-        <operation name="ProcessUserRequest">
-            <input message="tns:UserRequestMessage"/>
-            <output message="tns:UserResponseMessage"/>
-        </operation>
-    </portType>
-
-    <binding name="UserServiceBinding" type="tns:UserServicePort">
-        <soap:binding transport="http://schemas.xmlsoap.org/soap/http"/>
-        <operation name="ProcessUserRequest">
-            <soap:operation soapAction="http://example.com/soap-webservice/ProcessUserRequest"/>
-            <input>
-                <soap:body use="literal"/>
-            </input>
-            <output>
-                <soap:body use="literal"/>
-            </output>
-        </operation>
-    </binding>
-
-    <service name="UserService">
-        <port name="UserServicePort" binding="tns:UserServiceBinding">
-            <soap:address location="http://localhost:8080/ws"/>
-        </port>
-    </service>
-</definitions>
-
-
-
-
-
-package com.example.soapwebservice.config;
-
-import org.springframework.boot.web.servlet.ServletRegistrationBean;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.ws.config.annotation.EnableWs;
-import org.springframework.ws.config.annotation.WsConfigurerAdapter;
-import org.springframework.ws.transport.http.MessageDispatcherServlet;
-import org.springframework.ws.wsdl.wsdl11.DefaultWsdl11Definition;
-import org.springframework.xml.xsd.SimpleXsdSchema;
-import org.springframework.xml.xsd.XsdSchema;
-
-@EnableWs
-@Configuration
-public class WebServiceConfig extends WsConfigurerAdapter {
-
-    @Bean
-    public ServletRegistrationBean<MessageDispatcherServlet> messageDispatcherServlet(ApplicationContext context) {
-        MessageDispatcherServlet servlet = new MessageDispatcherServlet();
-        servlet.setApplicationContext(context);
-        servlet.setTransformWsdlLocations(true);
-        return new ServletRegistrationBean<>(servlet, "/ws/*");
-    }
-
-    @Bean(name = "userService")
-    public DefaultWsdl11Definition defaultWsdl11Definition(XsdSchema userSchema) {
-        DefaultWsdl11Definition wsdl11Definition = new DefaultWsdl11Definition();
-        wsdl11Definition.setPortTypeName("UserServicePort");
-        wsdl11Definition.setLocationUri("/ws");
-        wsdl11Definition.setTargetNamespace("http://example.com/soap-webservice");
-        wsdl11Definition.setSchema(userSchema);
-        return wsdl11Definition;
-    }
-
-    @Bean
-    public XsdSchema userSchema() {
-        return new SimpleXsdSchema(new ClassPathResource("xsd/user.xsd"));
-    }
+    // Getters and Setters
 }
 
 
 
-
-Sample SOAP Request:
-```xml
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-                  xmlns:web="http://example.com/soap-webservice">
-   <soapenv:Header>
-      <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
-         <!-- WS-Security Header (placeholder) -->
-      </wsse:Security>
-   </soapenv:Header>
-   <soapenv:Body>
-      <web:UserRequest>
-         <web:requestBody>Hello, this is a test request</web:requestBody>
-      </web:UserRequest>
-   </soapenv:Body>
-</soapenv:Envelope>
-
-Sample SOAP Response:
-```xml
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-                  xmlns:web="http://example.com/soap-webservice">
-   <soapenv:Body>
-      <web:UserResponse>
-         <web:responseBody>Hello, this is a test request</web:responseBody>
-      </web:UserResponse>
-   </soapenv:Body>
-</soapenv:Envelope>
-```
