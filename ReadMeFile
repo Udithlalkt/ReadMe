@@ -1,3 +1,27 @@
+
+
+<xsd:group name="SERVICERQPULL_CHOICE">
+    <xsd:choice>
+        <xsd:sequence>
+            <xsd:group ref="INSURANCESVCSPIRQMSGS" maxOccurs="unbounded"/>
+            <xsd:group ref="SURETYSVCSPIRQMSGS" minOccurs="0" maxOccurs="unbounded">
+                <xsd:annotation>
+                    <xsd:appinfo>
+                        <jaxb:property name="suretySvcRequestMessagesSequence"/>
+                    </jaxb:appinfo>
+                </xsd:annotation>
+            </xsd:group>
+        </xsd:sequence>
+        <xsd:group ref="SURETYSVCSPIRQMSGS" maxOccurs="unbounded">
+            <xsd:annotation>
+                <xsd:appinfo>
+                    <jaxb:property name="suretySvcRequestMessagesChoice"/>
+                </jaxb:appinfo>
+            </xsd:annotation>
+        </xsd:group>
+    </xsd:choice>
+</xsd:group>
+
 <jxb:bindings version="2.1" xmlns:jxb="http://java.sun.com/xml/ns/jaxb" xmlns:xs="http://www.w3.org/2001/XMLSchema">
     <jxb:bindings schemaLocation="MergedSchema.xsd" node="/xs:schema">
         <jxb:bindings node="//xs:group[@ref='SURETYSVCSPIRQMSGS']">
