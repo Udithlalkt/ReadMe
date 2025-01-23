@@ -44,21 +44,18 @@ public class WebServiceConfig {
 
 
 
-
-import org.springframework.boot.web.servlet.ServletRegistrationBean;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.ws.transport.http.MessageDispatcherServlet;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
-public class SoapWebServiceConfig {
+public class WebServiceConfig implements WebMvcConfigurer {
 
-    @Bean
-    public ServletRegistrationBean<MessageDispatcherServlet> messageDispatcherServlet(ApplicationContext applicationContext) {
-        MessageDispatcherServlet servlet = new MessageDispatcherServlet();
-        servlet.setApplicationContext(applicationContext);
-        servlet.setTransformWsdlLocations(true);
-        return new ServletRegistrationBean<>(servlet, "/businessservice/*");
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        // Serve the WSDL file from the resources/wsdl directory
+        registry.addResourceHandler("/businessservice/policyinquiry.wsdl")
+                .addResourceLocations("classpath:/wsdl/");
     }
 }
+
