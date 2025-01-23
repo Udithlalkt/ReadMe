@@ -1,57 +1,47 @@
+import org.springframework.boot.web.servlet.ServletRegistrationBean;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.ws.config.annotation.EnableWs;
+import org.springframework.ws.transport.http.MessageDispatcherServlet;
+import org.springframework.ws.wsdl.wsdl11.DefaultWsdl11Definition;
+import org.springframework.xml.xsd.SimpleXsdSchema;
+
+import javax.xml.transform.Source;
+import org.springframework.core.io.ClassPathResource;
+
+@EnableWs
+@Configuration
+public class WebServiceConfig {
+
+    @Bean
+    public ServletRegistrationBean<MessageDispatcherServlet> messageDispatcherServlet(ApplicationContext context) {
+        MessageDispatcherServlet servlet = new MessageDispatcherServlet();
+        servlet.setApplicationContext(context);
+        servlet.setTransformWsdlLocations(true);
+        return new ServletRegistrationBean<>(servlet, "/businessservice/*");
+    }
+
+    @Bean(name = "policyinquiry")
+    public DefaultWsdl11Definition wsdlDefinition() {
+        DefaultWsdl11Definition wsdl11Definition = new DefaultWsdl11Definition();
+        wsdl11Definition.setPortTypeName("PolicyInquiryPort");
+        wsdl11Definition.setLocationUri("/businessservice/policyinquiry");
+        wsdl11Definition.setTargetNamespace("http://www.avivacanada.com/services/policyintegrationservice/policybatchrenewal/v1");
+        
+        // Reference the static WSDL file
+        wsdl11Definition.setWsdl(loadWsdl());
+        
+        return wsdl11Definition;
+    }
+
+    @Bean
+    public Source loadWsdl() {
+        return new org.springframework.xml.transform.ResourceSource(
+            new ClassPathResource("wsdl/POLICYINQUIRY.wsdl"));
+    }
+}
 
 
-<xsd:group name="SERVICERQPULL_CHOICE">
-    <xsd:choice>
-        <xsd:sequence>
-            <xsd:group ref="INSURANCESVCSPIRQMSGS" maxOccurs="unbounded"/>
-            <xsd:group ref="SURETYSVCSPIRQMSGS" minOccurs="0" maxOccurs="unbounded">
-                <xsd:annotation>
-                    <xsd:appinfo>
-                        <jaxb:property name="suretySvcRequestMessagesSequence"/>
-                    </jaxb:appinfo>
-                </xsd:annotation>
-            </xsd:group>
-        </xsd:sequence>
-        <xsd:group ref="SURETYSVCSPIRQMSGS" maxOccurs="unbounded">
-            <xsd:annotation>
-                <xsd:appinfo>
-                    <jaxb:property name="suretySvcRequestMessagesChoice"/>
-                </jaxb:appinfo>
-            </xsd:annotation>
-        </xsd:group>
-    </xsd:choice>
-</xsd:group>
-
-<jxb:bindings version="2.1" xmlns:jxb="http://java.sun.com/xml/ns/jaxb" xmlns:xs="http://www.w3.org/2001/XMLSchema">
-    <jxb:bindings schemaLocation="MergedSchema.xsd" node="/xs:schema">
-        <jxb:bindings node="//xs:group[@ref='SURETYSVCSPIRQMSGS']">
-            <jxb:property name="suretySvcRequestMessages"/>
-        </jxb:bindings>
-    </jxb:bindings>
-</jxb:bindings>
 
 
-<plugin>
-    <groupId>org.codehaus.mojo</groupId>
-    <artifactId>jaxb2-maven-plugin</artifactId>
-    <version>3.1.0</version>
-    <executions>
-        <execution>
-            <id>xjc</id>
-            <goals>
-                <goal>xjc</goal>
-            </goals>
-        </execution>
-    </executions>
-    <configuration>
-        <sources>
-            <source>src/main/resources/xsd/MergedSchema.xsd</source>
-        </sources>
-        <outputDirectory>src/main/java</outputDirectory>
-        <clearOutputDir>false</clearOutputDir>
-        <bindingDirectory>src/main/resources</bindingDirectory>
-        <bindingFiles>
-            <bindingFile>bindings.xjb</bindingFile>
-        </bindingFiles>
-    </configuration>
-</plugin>
