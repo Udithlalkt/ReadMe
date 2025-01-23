@@ -1,49 +1,33 @@
-package com.avivacanada.services.policyintegrationservice.policybatchrenewal.v1;
-
-import jakarta.xml.bind.annotation.XmlAccessType;
-import jakarta.xml.bind.annotation.XmlAccessorType;
-import jakarta.xml.bind.annotation.XmlElement;
-import jakarta.xml.bind.annotation.XmlRootElement;
-import java.util.List;
-
-@XmlRootElement(name = "PolicyBatchRenewalRq")
-@XmlAccessorType(XmlAccessType.FIELD)
-public class PolicyBatchRenewalRq {
-
-    @XmlElement(name = "ClientInfo", namespace = "http://www.avivacanada.com/services/policyintegrationservice/policybatchrenewal/v1")
-    private ClientInfo clientInfo;
-
-    @XmlElement(name = "PrimaryPolicySystemId", namespace = "http://www.avivacanada.com/services/policyintegrationservice/policybatchrenewal/v1")
-    private String primaryPolicySystemId;
-
-    @XmlElement(name = "RenewalDetail", namespace = "http://www.avivacanada.com/services/policyintegrationservice/policybatchrenewal/v1")
-    private List<RenewalDetail> renewalDetails;
-
-    // Getters and Setters
-}
+<jxb:bindings version="2.1" xmlns:jxb="http://java.sun.com/xml/ns/jaxb" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+    <jxb:bindings schemaLocation="MergedSchema.xsd" node="/xs:schema">
+        <jxb:bindings node="//xs:group[@ref='SURETYSVCSPIRQMSGS']">
+            <jxb:property name="suretySvcRequestMessages"/>
+        </jxb:bindings>
+    </jxb:bindings>
+</jxb:bindings>
 
 
-
-package com.avivacanada.services.policyintegrationservice.policybatchrenewal.v1;
-
-import jakarta.xml.bind.annotation.XmlAccessType;
-import jakarta.xml.bind.annotation.XmlAccessorType;
-import jakarta.xml.bind.annotation.XmlElement;
-
-@XmlAccessorType(XmlAccessType.FIELD)
-public class ClientInfo {
-
-    @XmlElement(name = "ClientID", namespace = "http://www.avivacanada.com/services/policyintegrationservice/policybatchrenewal/v1")
-    private String clientId;
-
-    @XmlElement(name = "ClientName", namespace = "http://www.avivacanada.com/services/policyintegrationservice/policybatchrenewal/v1")
-    private String clientName;
-
-    @XmlElement(name = "ClientGUID", namespace = "http://www.avivacanada.com/services/policyintegrationservice/policybatchrenewal/v1")
-    private String clientGUID;
-
-    // Getters and Setters
-}
-
-
-
+<plugin>
+    <groupId>org.codehaus.mojo</groupId>
+    <artifactId>jaxb2-maven-plugin</artifactId>
+    <version>3.1.0</version>
+    <executions>
+        <execution>
+            <id>xjc</id>
+            <goals>
+                <goal>xjc</goal>
+            </goals>
+        </execution>
+    </executions>
+    <configuration>
+        <sources>
+            <source>src/main/resources/xsd/MergedSchema.xsd</source>
+        </sources>
+        <outputDirectory>src/main/java</outputDirectory>
+        <clearOutputDir>false</clearOutputDir>
+        <bindingDirectory>src/main/resources</bindingDirectory>
+        <bindingFiles>
+            <bindingFile>bindings.xjb</bindingFile>
+        </bindingFiles>
+    </configuration>
+</plugin>
