@@ -1,61 +1,73 @@
-import org.springframework.boot.web.servlet.ServletRegistrationBean;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.ws.config.annotation.EnableWs;
-import org.springframework.ws.transport.http.MessageDispatcherServlet;
-import org.springframework.ws.wsdl.wsdl11.DefaultWsdl11Definition;
-import org.springframework.xml.xsd.SimpleXsdSchema;
+<dependency>
+    <groupId>org.mockito</groupId>
+    <artifactId>mockito-core</artifactId>
+    <version>5.0.0</version>
+    <scope>test</scope>
+</dependency>
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-test</artifactId>
+    <scope>test</scope>
+</dependency>
 
-import javax.xml.transform.Source;
-import org.springframework.core.io.ClassPathResource;
 
-@EnableWs
-@Configuration
-public class WebServiceConfig {
+import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
 
-    @Bean
-    public ServletRegistrationBean<MessageDispatcherServlet> messageDispatcherServlet(ApplicationContext context) {
-        MessageDispatcherServlet servlet = new MessageDispatcherServlet();
-        servlet.setApplicationContext(context);
-        servlet.setTransformWsdlLocations(true);
-        return new ServletRegistrationBean<>(servlet, "/businessservice/*");
-    }
+import javax.jms.*;
 
-    @Bean(name = "policyinquiry")
-    public DefaultWsdl11Definition wsdlDefinition() {
-        DefaultWsdl11Definition wsdl11Definition = new DefaultWsdl11Definition();
-        wsdl11Definition.setPortTypeName("PolicyInquiryPort");
-        wsdl11Definition.setLocationUri("/businessservice/policyinquiry");
-        wsdl11Definition.setTargetNamespace("http://www.avivacanada.com/services/policyintegrationservice/policybatchrenewal/v1");
-        
-        // Reference the static WSDL file
-        wsdl11Definition.setWsdl(loadWsdl());
-        
-        return wsdl11Definition;
-    }
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
-    @Bean
-    public Source loadWsdl() {
-        return new org.springframework.xml.transform.ResourceSource(
-            new ClassPathResource("wsdl/POLICYINQUIRY.wsdl"));
+@ExtendWith(MockitoExtension.class)
+public class JmsProducerTest {
+
+    @Mock
+    private QueueConnectionFactory factory;
+
+    @Mock
+    private QueueConnection connection;
+
+    @Mock
+    private QueueSession session;
+
+    @Mock
+    private MessageProducer producer;
+
+    @Mock
+    private Destination destination;
+
+    @InjectMocks
+    private JmsProducer jmsProducer; // Replace with your actual class name
+
+    @Test
+    public void testSendMessage() throws Exception {
+        // Arrange
+        String message = "Test Message";
+        String correlationID = "12345";
+
+        when(factory.createQueueConnection()).thenReturn(connection);
+        when(connection.createQueueSession(false, Session.AUTO_ACKNOWLEDGE)).thenReturn(session);
+        when(session.createQueue(anyString())).thenReturn((Queue) destination);
+        when(session.createProducer(destination)).thenReturn(producer);
+
+        BytesMessage bytesMessage = mock(BytesMessage.class);
+        when(session.createBytesMessage()).thenReturn(bytesMessage);
+
+        // Act
+        jmsProducer.sendMessage(message, correlationID);
+
+        // Assert
+        verify(factory).createQueueConnection();
+        verify(connection).createQueueSession(false, Session.AUTO_ACKNOWLEDGE);
+        verify(session).createProducer(destination);
+        verify(producer).send(bytesMessage);
+
+        verify(bytesMessage).setJMSCorrelationID(correlationID);
+        verify(bytesMessage).writeBytes(message.getBytes());
     }
 }
-
-
-
-import org.springframework.context.annotation.Configuration;
-import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
-
-@Configuration
-public class WebServiceConfig implements WebMvcConfigurer {
-
-    @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // Serve the WSDL file from the resources/wsdl directory
-        registry.addResourceHandler("/businessservice/policyinquiry.wsdl")
-                .addResourceLocations("classpath:/wsdl/");
-    }
-}
-
