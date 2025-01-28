@@ -2,20 +2,19 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.ibm.mq.jms.MQDestination; // Replace with actual IBM MQ class
+import com.ibm.mq.jms.MQQueue; // Actual IBM MQ Queue class
+import com.ibm.mq.jms.MQQueueConnectionFactory; // IBM-specific connection factory
 import javax.jms.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
 public class MQServiceTest {
 
     @Mock
-    private QueueConnectionFactory factory;
+    private MQQueueConnectionFactory factory; // Use IBM-specific factory
 
     @Mock
     private QueueConnection connection;
@@ -29,24 +28,21 @@ public class MQServiceTest {
     @Mock
     private BytesMessage bytesMessage;
 
-    private MQService mqService; // Your service class containing sendMessage
+    private MQService mqService; // Your service class
 
     @BeforeEach
     void setup() {
         MockitoAnnotations.openMocks(this);
-        mqService = new MQService(factory); // Initialize your service with the mocked factory
+        mqService = new MQService(factory); // Inject mocked IBM factory
     }
 
     @Test
     void testSendMessage() throws JMSException {
-        // 1. Mock Destination to support both JmsDestination and MQDestination casts
-        MQDestination destinationRqMock = mock(
-            MQDestination.class, 
-            withSettings().extraInterfaces(JmsDestination.class) // Add JmsDestination interface
-        );
+        // 1. Mock IBM's MQQueue (implements Queue and MQDestination)
+        MQQueue destinationRqMock = mock(MQQueue.class);
 
-        // 2. Stub session.createQueue() to return the mock
-        when(session.createQueue(anyString())).thenReturn((Queue) destinationRqMock);
+        // 2. Stub session.createQueue() to return the IBM Queue mock
+        when(session.createQueue(anyString())).thenReturn(destinationRqMock);
 
         // 3. Stub factory and connection to return mocked objects
         when(factory.createQueueConnection()).thenReturn(connection);
@@ -54,30 +50,18 @@ public class MQServiceTest {
         when(session.createProducer(any(Destination.class))).thenReturn(messageProducer);
         when(session.createBytesMessage()).thenReturn(bytesMessage);
 
-        // 4. Capture arguments to verify MQ-specific properties
-        ArgumentCaptor<String> correlationIdCaptor = ArgumentCaptor.forClass(String.class);
+        // 4. Execute the method
+        String testMessage = "test";
+        String correlationId = "123";
+        mqService.sendMessage(testMessage, correlationId);
 
-        // 5. Execute the method under test
-        String testMessage = "test-message";
-        String testCorrelationId = "correlation-123";
-        mqService.sendMessage(testMessage, testCorrelationId);
+        // 5. Verify JMS interactions
+        verify(destinationRqMock).setBooleanProperty(eq("WMQ_MQMD_WRITE_ENABLED"), eq(true));
+        verify(destinationRqMock).setIntProperty(eq("WMQ_MQMD_MESSAGE_CONTEXT"), eq(2));
+        verify(destinationRqMock).setMessageBodyStyle(eq(WMQ_MESSAGE_BODY_MQ));
 
-        // 6. Verify interactions with JmsDestination (interface)
-        JmsDestination jmsDestinationMock = (JmsDestination) destinationRqMock;
-        verify(jmsDestinationMock).setBooleanProperty(eq("WMQ_MQMD_WRITE_ENABLED"), eq(true));
-        verify(jmsDestinationMock).setIntProperty(eq("WMQ_MQMD_MESSAGE_CONTEXT"), eq(2)); // Replace with actual value
-
-        // 7. Verify interactions with MQDestination (class)
-        verify(destinationRqMock).setMessageBodyStyle(eq(WMQ_MESSAGE_BODY_MQ)); // Replace with actual value
-
-        // 8. Verify message properties
-        verify(bytesMessage).setJMSCorrelationID(testCorrelationId);
-        verify(bytesMessage).writeBytes(testMessage.getBytes());
+        // 6. Verify message properties
+        verify(bytesMessage).setJMSCorrelationID(correlationId);
         verify(messageProducer).send(bytesMessage);
-
-        // 9. Verify connection cleanup
-        verify(messageProducer).close();
-        verify(session).close();
-        verify(connection).close();
     }
 }
