@@ -1,30 +1,18 @@
-<dependency>
-    <groupId>org.mockito</groupId>
-    <artifactId>mockito-core</artifactId>
-    <version>5.0.0</version>
-    <scope>test</scope>
-</dependency>
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-test</artifactId>
-    <scope>test</scope>
-</dependency>
-
-
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.ibm.mq.jms.MQDestination; // Replace with actual IBM MQ class
 import javax.jms.*;
-
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
+import org.mockito.MockitoAnnotations;
+import org.springframework.boot.test.context.SpringBootTest;
 
-@ExtendWith(MockitoExtension.class)
-public class JmsProducerTest {
+@SpringBootTest
+public class MQServiceTest {
 
     @Mock
     private QueueConnectionFactory factory;
@@ -36,38 +24,60 @@ public class JmsProducerTest {
     private QueueSession session;
 
     @Mock
-    private MessageProducer producer;
+    private MessageProducer messageProducer;
 
     @Mock
-    private Destination destination;
+    private BytesMessage bytesMessage;
 
-    @InjectMocks
-    private JmsProducer jmsProducer; // Replace with your actual class name
+    private MQService mqService; // Your service class containing sendMessage
+
+    @BeforeEach
+    void setup() {
+        MockitoAnnotations.openMocks(this);
+        mqService = new MQService(factory); // Initialize your service with the mocked factory
+    }
 
     @Test
-    public void testSendMessage() throws Exception {
-        // Arrange
-        String message = "Test Message";
-        String correlationID = "12345";
+    void testSendMessage() throws JMSException {
+        // 1. Mock Destination to support both JmsDestination and MQDestination casts
+        MQDestination destinationRqMock = mock(
+            MQDestination.class, 
+            withSettings().extraInterfaces(JmsDestination.class) // Add JmsDestination interface
+        );
 
+        // 2. Stub session.createQueue() to return the mock
+        when(session.createQueue(anyString())).thenReturn((Queue) destinationRqMock);
+
+        // 3. Stub factory and connection to return mocked objects
         when(factory.createQueueConnection()).thenReturn(connection);
-        when(connection.createQueueSession(false, Session.AUTO_ACKNOWLEDGE)).thenReturn(session);
-        when(session.createQueue(anyString())).thenReturn((Queue) destination);
-        when(session.createProducer(destination)).thenReturn(producer);
-
-        BytesMessage bytesMessage = mock(BytesMessage.class);
+        when(connection.createQueueSession(anyBoolean(), anyInt())).thenReturn(session);
+        when(session.createProducer(any(Destination.class))).thenReturn(messageProducer);
         when(session.createBytesMessage()).thenReturn(bytesMessage);
 
-        // Act
-        jmsProducer.sendMessage(message, correlationID);
+        // 4. Capture arguments to verify MQ-specific properties
+        ArgumentCaptor<String> correlationIdCaptor = ArgumentCaptor.forClass(String.class);
 
-        // Assert
-        verify(factory).createQueueConnection();
-        verify(connection).createQueueSession(false, Session.AUTO_ACKNOWLEDGE);
-        verify(session).createProducer(destination);
-        verify(producer).send(bytesMessage);
+        // 5. Execute the method under test
+        String testMessage = "test-message";
+        String testCorrelationId = "correlation-123";
+        mqService.sendMessage(testMessage, testCorrelationId);
 
-        verify(bytesMessage).setJMSCorrelationID(correlationID);
-        verify(bytesMessage).writeBytes(message.getBytes());
+        // 6. Verify interactions with JmsDestination (interface)
+        JmsDestination jmsDestinationMock = (JmsDestination) destinationRqMock;
+        verify(jmsDestinationMock).setBooleanProperty(eq("WMQ_MQMD_WRITE_ENABLED"), eq(true));
+        verify(jmsDestinationMock).setIntProperty(eq("WMQ_MQMD_MESSAGE_CONTEXT"), eq(2)); // Replace with actual value
+
+        // 7. Verify interactions with MQDestination (class)
+        verify(destinationRqMock).setMessageBodyStyle(eq(WMQ_MESSAGE_BODY_MQ)); // Replace with actual value
+
+        // 8. Verify message properties
+        verify(bytesMessage).setJMSCorrelationID(testCorrelationId);
+        verify(bytesMessage).writeBytes(testMessage.getBytes());
+        verify(messageProducer).send(bytesMessage);
+
+        // 9. Verify connection cleanup
+        verify(messageProducer).close();
+        verify(session).close();
+        verify(connection).close();
     }
 }
