@@ -1,67 +1,84 @@
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-import static org.junit.jupiter.api.Assertions.*;
-
-import com.ibm.mq.jms.MQQueue; // Actual IBM MQ Queue class
-import com.ibm.mq.jms.MQQueueConnectionFactory; // IBM-specific connection factory
-import javax.jms.*;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import java.lang.reflect.*;
+import java.util.Arrays;
+import java.util.List;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class MQServiceTest {
+public class PojoTest {
 
-    @Mock
-    private MQQueueConnectionFactory factory; // Use IBM-specific factory
-
-    @Mock
-    private QueueConnection connection;
-
-    @Mock
-    private QueueSession session;
-
-    @Mock
-    private MessageProducer messageProducer;
-
-    @Mock
-    private BytesMessage bytesMessage;
-
-    private MQService mqService; // Your service class
-
-    @BeforeEach
-    void setup() {
-        MockitoAnnotations.openMocks(this);
-        mqService = new MQService(factory); // Inject mocked IBM factory
-    }
+    // List all POJO and JAXB classes to be tested
+    private static final List<Class<?>> CLASSES_TO_TEST = Arrays.asList(
+            MyPojo.class,
+            MyJaxbClass.class
+            // Add other classes here
+    );
 
     @Test
-    void testSendMessage() throws JMSException {
-        // 1. Mock IBM's MQQueue (implements Queue and MQDestination)
-        MQQueue destinationRqMock = mock(MQQueue.class);
+    void testAllGettersAndSetters() throws Exception {
+        for (Class<?> clazz : CLASSES_TO_TEST) {
+            testGettersAndSetters(clazz);
+        }
+    }
 
-        // 2. Stub session.createQueue() to return the IBM Queue mock
-        when(session.createQueue(anyString())).thenReturn(destinationRqMock);
+    private void testGettersAndSetters(Class<?> clazz) throws Exception {
+        Object instance = clazz.getDeclaredConstructor().newInstance();
 
-        // 3. Stub factory and connection to return mocked objects
-        when(factory.createQueueConnection()).thenReturn(connection);
-        when(connection.createQueueSession(anyBoolean(), anyInt())).thenReturn(session);
-        when(session.createProducer(any(Destination.class))).thenReturn(messageProducer);
-        when(session.createBytesMessage()).thenReturn(bytesMessage);
+        for (Field field : clazz.getDeclaredFields()) {
+            if (Modifier.isStatic(field.getModifiers()) || Modifier.isFinal(field.getModifiers())) {
+                continue; // Skip static or final fields
+            }
 
-        // 4. Execute the method
-        String testMessage = "test";
-        String correlationId = "123";
-        mqService.sendMessage(testMessage, correlationId);
+            String fieldName = field.getName();
+            Class<?> fieldType = field.getType();
 
-        // 5. Verify JMS interactions
-        verify(destinationRqMock).setBooleanProperty(eq("WMQ_MQMD_WRITE_ENABLED"), eq(true));
-        verify(destinationRqMock).setIntProperty(eq("WMQ_MQMD_MESSAGE_CONTEXT"), eq(2));
-        verify(destinationRqMock).setMessageBodyStyle(eq(WMQ_MESSAGE_BODY_MQ));
+            Object testValue = getTestValue(fieldType);
+            Method setter = findSetter(clazz, fieldName, fieldType);
+            Method getter = findGetter(clazz, fieldName, fieldType);
 
-        // 6. Verify message properties
-        verify(bytesMessage).setJMSCorrelationID(correlationId);
-        verify(messageProducer).send(bytesMessage);
+            if (setter == null || getter == null) {
+                continue; // Skip if methods not found
+            }
+
+            setter.invoke(instance, testValue);
+            Object returnedValue = getter.invoke(instance);
+            assertEquals(testValue, returnedValue, 
+                "Field " + fieldName + " in " + clazz.getSimpleName() + " mismatch");
+        }
+    }
+
+    private Method findSetter(Class<?> clazz, String fieldName, Class<?> fieldType) {
+        try {
+            return clazz.getMethod("set" + capitalize(fieldName), fieldType);
+        } catch (NoSuchMethodException e) {
+            return null;
+        }
+    }
+
+    private Method findGetter(Class<?> clazz, String fieldName, Class<?> fieldType) {
+        String prefix = (fieldType == boolean.class || fieldType == Boolean.class) ? "is" : "get";
+        try {
+            return clazz.getMethod(prefix + capitalize(fieldName));
+        } catch (NoSuchMethodException e) {
+            return null;
+        }
+    }
+
+    private String capitalize(String str) {
+        return str.substring(0, 1).toUpperCase() + str.substring(1);
+    }
+
+    private Object getTestValue(Class<?> type) {
+        if (type == String.class) return "test";
+        if (type == int.class || type == Integer.class) return 1;
+        if (type == boolean.class || type == Boolean.class) return true;
+        if (type == double.class || type == Double.class) return 1.0;
+        if (type == long.class || type == Long.class) return 1L;
+        if (type == float.class || type == Float.class) return 1.0f;
+        if (type.isEnum()) return type.getEnumConstants()[0];
+        try {
+            return type.getDeclaredConstructor().newInstance(); // Handle nested POJOs
+        } catch (Exception e) {
+            return null;
+        }
     }
 }
