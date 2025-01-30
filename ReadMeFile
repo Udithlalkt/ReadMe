@@ -1,69 +1,100 @@
 <dependencies>
-    <!-- Jakarta XML Web Services API (replaces old javax.xml) -->
+    <!-- Jackson for JSON -->
     <dependency>
-        <groupId>jakarta.xml.ws</groupId>
-        <artifactId>jakarta.xml.ws-api</artifactId>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+        <version>2.17.0</version>
+    </dependency>
+    <dependency>
+        <groupId>com.fasterxml.jackson.module</groupId>
+        <artifactId>jackson-module-jaxb-annotations</artifactId>
+        <version>2.17.0</version>
+    </dependency>
+
+    <!-- JAXB for XML (Jakarta EE 9+) -->
+    <dependency>
+        <groupId>jakarta.xml.bind</groupId>
+        <artifactId>jakarta.xml.bind-api</artifactId>
         <version>4.0.0</version>
+    </dependency>
+    <dependency>
+        <groupId>org.glassfish.jaxb</groupId>
+        <artifactId>jaxb-runtime</artifactId>
+        <version>4.0.4</version>
+        <scope>runtime</scope>
     </dependency>
 </dependencies>
 
-
 <build>
     <plugins>
+        <!-- Generate classes from WSDL with JAXB + Jackson annotations -->
         <plugin>
-            <groupId>com.sun.xml.ws</groupId>
-            <artifactId>jaxws-maven-plugin</artifactId>
-            <version>4.0.1</version>
+            <groupId>org.apache.cxf</groupId>
+            <artifactId>cxf-codegen-plugin</artifactId>
+            <version>3.6.1</version>
             <executions>
                 <execution>
-                    <goals>
-                        <goal>wsimport</goal>
-                    </goals>
+                    <id>generate-sources</id>
+                    <phase>generate-sources</phase>
                     <configuration>
-                        <!-- Path to WSDL (local file or URL) -->
-                        <wsdlUrls>
-                            <wsdlUrl>src/main/resources/wsdl/your-service.wsdl</wsdlUrl>
-                        </wsdlUrls>
-                        <!-- Package for generated classes -->
-                        <packageName>com.example.generated</packageName>
-                        <keep>true</keep>
-                        <verbose>true</verbose>
+                        <sourceRoot>${project.build.directory}/generated-sources/cxf</sourceRoot>
+                        <wsdlOptions>
+                            <wsdlOption>
+                                <wsdl>src/main/resources/wsdl/your-service.wsdl</wsdl>
+                                <packagename>com.example.generated</packagename>
+                                <!-- Enable JAXB customizations -->
+                                <bindingFiles>
+                                    <bindingFile>src/main/jaxb/bindings.xjb</bindingFile>
+                                </bindingFiles>
+                                <extraargs>
+                                    <extraarg>-xjc-Xannotate</extraarg>
+                                </extraargs>
+                            </wsdlOption>
+                        </wsdlOptions>
                     </configuration>
+                    <goals>
+                        <goal>wsdl2java</goal>
+                    </goals>
                 </execution>
             </executions>
+            <dependencies>
+                <!-- Add jaxb2-annotate plugin -->
+                <dependency>
+                    <groupId>org.jvnet.jaxb2_commons</groupId>
+                    <artifactId>jaxb2-annotate</artifactId>
+                    <version>1.1.1</version>
+                </dependency>
+            </dependencies>
         </plugin>
     </plugins>
 </build>
 
 
 
-<plugin>
-    <groupId>org.jvnet.jaxb2.maven2</groupId>
-    <artifactId>maven-jaxb2-plugin</artifactId>
-    <version>0.14.0</version>
-    <executions>
-        <execution>
-            <goals>
-                <goal>generate</goal>
-            </goals>
-            <configuration>
-                <extension>true</extension>
-                <args>
-                    <arg>-Xjson</arg>
-                </args>
-            </configuration>
-        </execution>
-    </executions>
-    <dependencies>
-        <dependency>
-            <groupId>org.jvnet.jaxb2_commons</groupId>
-            <artifactId>jaxb2-basics</artifactId>
-            <version>0.12.0</version>
-        </dependency>
-        <dependency>
-            <groupId>org.jvnet.jaxb2_commons</groupId>
-            <artifactId>jaxb2-basics-annotate</artifactId>
-            <version>0.12.0</version>
-        </dependency>
-    </dependencies>
-</plugin>
+
+
+<?xml version="1.0" encoding="UTF-8"?>
+<jaxb:bindings
+    xmlns:jaxb="https://jakarta.ee/xml/ns/jaxb"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    xmlns:annox="http://annox.dev.java.net"
+    jaxb:version="3.0">
+
+    <!-- Add @JsonProperty to all fields -->
+    <jaxb:bindings node="//xs:element">
+        <annox:annotate>
+            <com.fasterxml.jackson.annotation.JsonProperty value="{@name}"/>
+        </annox:annotate>
+    </jaxb:bindings>
+
+    <!-- Add @JsonIgnore to specific fields (optional) -->
+    <jaxb:bindings node="//xs:element[@name='sensitiveField']">
+        <annox:annotate>
+            <com.fasterxml.jackson.annotation.JsonIgnore/>
+        </annox:annotate>
+    </jaxb:bindings>
+
+</jaxb:bindings>
+
+
+
