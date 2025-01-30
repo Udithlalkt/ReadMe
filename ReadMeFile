@@ -1,37 +1,36 @@
-<dependency>
-    <groupId>org.jvnet.jaxb2_commons</groupId>
-    <artifactId>jaxb2-basics-annotate</artifactId>
-    <version>1.1.0</version>
-</dependency>
+<dependencies>
+    <!-- Jakarta XML Web Services API (replaces old javax.xml) -->
+    <dependency>
+        <groupId>jakarta.xml.ws</groupId>
+        <artifactId>jakarta.xml.ws-api</artifactId>
+        <version>4.0.0</version>
+    </dependency>
+</dependencies>
 
 
-
-<jaxb:bindings 
-    version="2.1"
-    xmlns:jaxb="http://java.sun.com/xml/ns/jaxb"
-    xmlns:xs="http://www.w3.org/2001/XMLSchema"
-    xmlns:xjc="http://java.sun.com/xml/ns/jaxb/xjc"
-    xmlns:annox="http://annox.dev.java.net"  <!-- For custom annotations -->
-    jaxb:extensionBindingPrefixes="xjc annox">
-
-    <!-- Target the BatchRenewalRq complex type -->
-    <jaxb:bindings schemaLocation="your-schema.xsd">
-        <jaxb:bindings node="//xs:complexType[@name='BatchRenewalRq']">
-            <!-- Add @XmlRootElement to the class -->
-            <annox:annotate>
-                @javax.xml.bind.annotation.XmlRootElement(
-                    name = "PolicyBatchRenewalRq",
-                    namespace = "http://www.avivaca"  <!-- Match your namespace -->
-                )
-            </annox:annotate>
-            <!-- Add @XmlAccessorType -->
-            <jaxb:class>
-                <jaxb:annotate>@javax.xml.bind.annotation.XmlAccessorType(javax.xml.bind.annotation.XmlAccessType.FIELD)</jaxb:annotate>
-            </jaxb:class>
-        </jaxb:bindings>
-    </jaxb:bindings>
-
-</jaxb:bindings>
-
-
-
+<build>
+    <plugins>
+        <plugin>
+            <groupId>com.sun.xml.ws</groupId>
+            <artifactId>jaxws-maven-plugin</artifactId>
+            <version>4.0.1</version>
+            <executions>
+                <execution>
+                    <goals>
+                        <goal>wsimport</goal>
+                    </goals>
+                    <configuration>
+                        <!-- Path to WSDL (local file or URL) -->
+                        <wsdlUrls>
+                            <wsdlUrl>src/main/resources/wsdl/your-service.wsdl</wsdlUrl>
+                        </wsdlUrls>
+                        <!-- Package for generated classes -->
+                        <packageName>com.example.generated</packageName>
+                        <keep>true</keep>
+                        <verbose>true</verbose>
+                    </configuration>
+                </execution>
+            </executions>
+        </plugin>
+    </plugins>
+</build>
