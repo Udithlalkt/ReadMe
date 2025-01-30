@@ -1,84 +1,16 @@
-import org.junit.jupiter.api.Test;
-import java.lang.reflect.*;
-import java.util.Arrays;
-import java.util.List;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+<?xml version="1.0" encoding="UTF-8"?>
+<jaxb:bindings 
+    version="2.1"
+    xmlns:jaxb="http://java.sun.com/xml/ns/jaxb"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    xmlns:xjc="http://java.sun.com/xml/ns/jaxb/xjc"
+    jaxb:extensionBindingPrefixes="xjc">
 
-public class PojoTest {
+    <!-- Map the XSD element to a Java class -->
+    <jaxb:bindings schemaLocation="../resources/schemas/your-schema.xsd">
+        <jaxb:bindings node="//xs:element[@name='PolicyBatchRenewalRq']">
+            <jaxb:class name="PolicyBatchRenewalRq"/>
+        </jaxb:bindings>
+    </jaxb:bindings>
 
-    // List all POJO and JAXB classes to be tested
-    private static final List<Class<?>> CLASSES_TO_TEST = Arrays.asList(
-            MyPojo.class,
-            MyJaxbClass.class
-            // Add other classes here
-    );
-
-    @Test
-    void testAllGettersAndSetters() throws Exception {
-        for (Class<?> clazz : CLASSES_TO_TEST) {
-            testGettersAndSetters(clazz);
-        }
-    }
-
-    private void testGettersAndSetters(Class<?> clazz) throws Exception {
-        Object instance = clazz.getDeclaredConstructor().newInstance();
-
-        for (Field field : clazz.getDeclaredFields()) {
-            if (Modifier.isStatic(field.getModifiers()) || Modifier.isFinal(field.getModifiers())) {
-                continue; // Skip static or final fields
-            }
-
-            String fieldName = field.getName();
-            Class<?> fieldType = field.getType();
-
-            Object testValue = getTestValue(fieldType);
-            Method setter = findSetter(clazz, fieldName, fieldType);
-            Method getter = findGetter(clazz, fieldName, fieldType);
-
-            if (setter == null || getter == null) {
-                continue; // Skip if methods not found
-            }
-
-            setter.invoke(instance, testValue);
-            Object returnedValue = getter.invoke(instance);
-            assertEquals(testValue, returnedValue, 
-                "Field " + fieldName + " in " + clazz.getSimpleName() + " mismatch");
-        }
-    }
-
-    private Method findSetter(Class<?> clazz, String fieldName, Class<?> fieldType) {
-        try {
-            return clazz.getMethod("set" + capitalize(fieldName), fieldType);
-        } catch (NoSuchMethodException e) {
-            return null;
-        }
-    }
-
-    private Method findGetter(Class<?> clazz, String fieldName, Class<?> fieldType) {
-        String prefix = (fieldType == boolean.class || fieldType == Boolean.class) ? "is" : "get";
-        try {
-            return clazz.getMethod(prefix + capitalize(fieldName));
-        } catch (NoSuchMethodException e) {
-            return null;
-        }
-    }
-
-    private String capitalize(String str) {
-        return str.substring(0, 1).toUpperCase() + str.substring(1);
-    }
-
-    private Object getTestValue(Class<?> type) {
-        if (type == String.class) return "test";
-        if (type == int.class || type == Integer.class) return 1;
-        if (type == boolean.class || type == Boolean.class) return true;
-        if (type == double.class || type == Double.class) return 1.0;
-        if (type == long.class || type == Long.class) return 1L;
-        if (type == float.class || type == Float.class) return 1.0f;
-        if (type.isEnum()) return type.getEnumConstants()[0];
-        try {
-            return type.getDeclaredConstructor().newInstance(); // Handle nested POJOs
-        } catch (Exception e) {
-            return null;
-        }
-    }
-}
+</jaxb:bindings>
