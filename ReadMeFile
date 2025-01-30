@@ -1,16 +1,37 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<dependency>
+    <groupId>org.jvnet.jaxb2_commons</groupId>
+    <artifactId>jaxb2-basics-annotate</artifactId>
+    <version>1.1.0</version>
+</dependency>
+
+
+
 <jaxb:bindings 
     version="2.1"
     xmlns:jaxb="http://java.sun.com/xml/ns/jaxb"
     xmlns:xs="http://www.w3.org/2001/XMLSchema"
     xmlns:xjc="http://java.sun.com/xml/ns/jaxb/xjc"
-    jaxb:extensionBindingPrefixes="xjc">
+    xmlns:annox="http://annox.dev.java.net"  <!-- For custom annotations -->
+    jaxb:extensionBindingPrefixes="xjc annox">
 
-    <!-- Map the XSD element to a Java class -->
-    <jaxb:bindings schemaLocation="../resources/schemas/your-schema.xsd">
-        <jaxb:bindings node="//xs:element[@name='PolicyBatchRenewalRq']">
-            <jaxb:class name="PolicyBatchRenewalRq"/>
+    <!-- Target the BatchRenewalRq complex type -->
+    <jaxb:bindings schemaLocation="your-schema.xsd">
+        <jaxb:bindings node="//xs:complexType[@name='BatchRenewalRq']">
+            <!-- Add @XmlRootElement to the class -->
+            <annox:annotate>
+                @javax.xml.bind.annotation.XmlRootElement(
+                    name = "PolicyBatchRenewalRq",
+                    namespace = "http://www.avivaca"  <!-- Match your namespace -->
+                )
+            </annox:annotate>
+            <!-- Add @XmlAccessorType -->
+            <jaxb:class>
+                <jaxb:annotate>@javax.xml.bind.annotation.XmlAccessorType(javax.xml.bind.annotation.XmlAccessType.FIELD)</jaxb:annotate>
+            </jaxb:class>
         </jaxb:bindings>
     </jaxb:bindings>
 
 </jaxb:bindings>
+
+
+
