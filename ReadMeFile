@@ -1,41 +1,98 @@
-import com.example.generated.BatchRenewalRq;
-import com.example.generated.BatchRenewalRs;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.module.jaxb.JaxbAnnotationModule;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ClassPathResource;
-import jakarta.xml.bind.JAXBContext;
-import jakarta.xml.bind.Unmarshaller;
+
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.Unmarshaller;
 import java.io.InputStream;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
 
-@SpringBootTest
-public class BatchRenewalProcessorTest {
+@ExtendWith(MockitoExtension.class)
+class ComponentTest {
 
-    @Autowired
-    private BatchRenewalProcessor batchRenewalProcessor; // Class containing processRequest()
+    @Mock
+    private JmsIntegrator jmsIntegrator;
+    
+    @Mock
+    private MfRequestMapper mfRequestMapper;
+    
+    @Mock
+    private ResponseMapper responseMapper;
+    
+    @InjectMocks
+    private ComponentTestClass componentUnderTest;
 
-    @Test
-    void processRequest_WithValidXmlRequest_ReturnsValidResponse() throws Exception {
-        // 1. Load XML test file from resources
-        ClassPathResource resource = new ClassPathResource("requests/batch-renewal-request.xml");
-        
-        // 2. Unmarshal XML to JAXB object
-        BatchRenewalRq request = unmarshalXml(resource.getInputStream(), BatchRenewalRq.class);
-        
-        // 3. Process the request
-        BatchRenewalRs response = batchRenewalProcessor.processRequest(request);
-        
-        // 4. Assertions
-        assertNotNull(response, "Response should not be null");
-        assertNotNull(response.getDetails(), "Details should not be null");
-        // Add more domain-specific assertions here
+    private final ObjectMapper xmlMapper = new ObjectMapper();
+
+    @BeforeEach
+    void setup() {
+        xmlMapper.registerModule(new JaxbAnnotationModule());
     }
 
-    private <T> T unmarshalXml(InputStream xmlStream, Class<T> clazz) throws Exception {
-        JAXBContext jaxbContext = JAXBContext.newInstance(clazz);
-        Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
-        return clazz.cast(unmarshaller.unmarshal(xmlStream));
+    @Test
+    void processRequest_ValidRequest_SuccessFlow() throws Exception {
+        // Arrange
+        BatchRenewalRe request = loadXmlRequest("/requests/valid_request.xml");
+        String mockCcbPayload = "CCB_FORMAT_STRING";
+        BatchRenewalRe mockResponse = new BatchRenewalRe();
+
+        when(mfRequestMapper.createMFRequestPayLoad(request)).thenReturn(mockCcbPayload);
+        when(responseMapper.mapresponse(request)).thenReturn(mockResponse);
+
+        // Act
+        BatchRenewalRe result = componentUnderTest.processRequest(request);
+
+        // Assert
+        verify(jmsIntegrator).sendMessage(mockCcbPayload, request.getClientInfo().getClientBUID());
+        assertEquals(mockResponse, result);
+    }
+
+    @Test
+    void processRequest_EmptyRenewalDetails_ErrorFlow() throws Exception {
+        // Arrange
+        BatchRenewalRe request = loadXmlRequest("/requests/empty_details_request.xml");
+        CustomServiceException expectedException = new CustomServiceException(BUSINESS_VALIDATION_CODE, BLANK_RENEWAL_DETAILS);
+        String mockErrorPayload = "ERROR_PAYLOAD";
+        BatchRenewalRe mockErrorResponse = new BatchRenewalRe();
+
+        when(mfRequestMapper.createMFErrorRequestPayLoad(expectedException, request)).thenReturn(mockErrorPayload);
+        when(responseMapper.createErrorResponse(expectedException, request)).thenReturn(mockErrorResponse);
+
+        // Act & Assert
+        assertThrows(CustomServiceException.class, () -> {
+            componentUnderTest.processRequest(request);
+        });
+
+        verify(jmsIntegrator).sendMessage(mockErrorPayload, request.getClientInfo().getClientBUID());
+    }
+
+    @Test
+    void processRequest_JmsException_ServiceFaultFlow() throws Exception {
+        // Arrange
+        BatchRenewalRe request = loadXmlRequest("/requests/valid_request.xml");
+        when(mfRequestMapper.createMFRequestPayLoad(request)).thenThrow(new IOException("JMS Connection Failed"));
+
+        // Act & Assert
+        assertThrows(ServiceFaultException.class, () -> {
+            componentUnderTest.processRequest(request);
+        });
+    }
+
+    private BatchRenewalRe loadXmlRequest(String filePath) throws Exception {
+        JAXBContext context = JAXBContext.newInstance(BatchRenewalRe.class);
+        Unmarshaller unmarshaller = context.createUnmarshaller();
+        
+        try (InputStream is = new ClassPathResource(filePath).getInputStream()) {
+            return (BatchRenewalRe) unmarshaller.unmarshal(is);
+        }
     }
 }
