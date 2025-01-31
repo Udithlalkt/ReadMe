@@ -1,100 +1,41 @@
-<dependencies>
-    <!-- Jackson for JSON -->
-    <dependency>
-        <groupId>com.fasterxml.jackson.core</groupId>
-        <artifactId>jackson-databind</artifactId>
-        <version>2.17.0</version>
-    </dependency>
-    <dependency>
-        <groupId>com.fasterxml.jackson.module</groupId>
-        <artifactId>jackson-module-jaxb-annotations</artifactId>
-        <version>2.17.0</version>
-    </dependency>
+import com.example.generated.BatchRenewalRq;
+import com.example.generated.BatchRenewalRs;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.io.ClassPathResource;
+import jakarta.xml.bind.JAXBContext;
+import jakarta.xml.bind.Unmarshaller;
+import java.io.InputStream;
 
-    <!-- JAXB for XML (Jakarta EE 9+) -->
-    <dependency>
-        <groupId>jakarta.xml.bind</groupId>
-        <artifactId>jakarta.xml.bind-api</artifactId>
-        <version>4.0.0</version>
-    </dependency>
-    <dependency>
-        <groupId>org.glassfish.jaxb</groupId>
-        <artifactId>jaxb-runtime</artifactId>
-        <version>4.0.4</version>
-        <scope>runtime</scope>
-    </dependency>
-</dependencies>
+import static org.junit.jupiter.api.Assertions.*;
 
-<build>
-    <plugins>
-        <!-- Generate classes from WSDL with JAXB + Jackson annotations -->
-        <plugin>
-            <groupId>org.apache.cxf</groupId>
-            <artifactId>cxf-codegen-plugin</artifactId>
-            <version>3.6.1</version>
-            <executions>
-                <execution>
-                    <id>generate-sources</id>
-                    <phase>generate-sources</phase>
-                    <configuration>
-                        <sourceRoot>${project.build.directory}/generated-sources/cxf</sourceRoot>
-                        <wsdlOptions>
-                            <wsdlOption>
-                                <wsdl>src/main/resources/wsdl/your-service.wsdl</wsdl>
-                                <packagename>com.example.generated</packagename>
-                                <!-- Enable JAXB customizations -->
-                                <bindingFiles>
-                                    <bindingFile>src/main/jaxb/bindings.xjb</bindingFile>
-                                </bindingFiles>
-                                <extraargs>
-                                    <extraarg>-xjc-Xannotate</extraarg>
-                                </extraargs>
-                            </wsdlOption>
-                        </wsdlOptions>
-                    </configuration>
-                    <goals>
-                        <goal>wsdl2java</goal>
-                    </goals>
-                </execution>
-            </executions>
-            <dependencies>
-                <!-- Add jaxb2-annotate plugin -->
-                <dependency>
-                    <groupId>org.jvnet.jaxb2_commons</groupId>
-                    <artifactId>jaxb2-annotate</artifactId>
-                    <version>1.1.1</version>
-                </dependency>
-            </dependencies>
-        </plugin>
-    </plugins>
-</build>
+@SpringBootTest
+public class BatchRenewalProcessorTest {
 
+    @Autowired
+    private BatchRenewalProcessor batchRenewalProcessor; // Class containing processRequest()
 
+    @Test
+    void processRequest_WithValidXmlRequest_ReturnsValidResponse() throws Exception {
+        // 1. Load XML test file from resources
+        ClassPathResource resource = new ClassPathResource("requests/batch-renewal-request.xml");
+        
+        // 2. Unmarshal XML to JAXB object
+        BatchRenewalRq request = unmarshalXml(resource.getInputStream(), BatchRenewalRq.class);
+        
+        // 3. Process the request
+        BatchRenewalRs response = batchRenewalProcessor.processRequest(request);
+        
+        // 4. Assertions
+        assertNotNull(response, "Response should not be null");
+        assertNotNull(response.getDetails(), "Details should not be null");
+        // Add more domain-specific assertions here
+    }
 
-
-
-<?xml version="1.0" encoding="UTF-8"?>
-<jaxb:bindings
-    xmlns:jaxb="https://jakarta.ee/xml/ns/jaxb"
-    xmlns:xs="http://www.w3.org/2001/XMLSchema"
-    xmlns:annox="http://annox.dev.java.net"
-    jaxb:version="3.0">
-
-    <!-- Add @JsonProperty to all fields -->
-    <jaxb:bindings node="//xs:element">
-        <annox:annotate>
-            <com.fasterxml.jackson.annotation.JsonProperty value="{@name}"/>
-        </annox:annotate>
-    </jaxb:bindings>
-
-    <!-- Add @JsonIgnore to specific fields (optional) -->
-    <jaxb:bindings node="//xs:element[@name='sensitiveField']">
-        <annox:annotate>
-            <com.fasterxml.jackson.annotation.JsonIgnore/>
-        </annox:annotate>
-    </jaxb:bindings>
-
-</jaxb:bindings>
-
-
-
+    private <T> T unmarshalXml(InputStream xmlStream, Class<T> clazz) throws Exception {
+        JAXBContext jaxbContext = JAXBContext.newInstance(clazz);
+        Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
+        return clazz.cast(unmarshaller.unmarshal(xmlStream));
+    }
+}
